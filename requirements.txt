@@ -1,0 +1,6 @@
+pyGLM==2.5.7
+PyQt6==6.2.1
+PyOpenGL==3.1.5
+PyOpenGl-accelerate==3.1.5
+imageio==2.13.3
+pyrr==0.10.3
