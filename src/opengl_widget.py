@@ -138,7 +138,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         glMatrixMode(GL_MODELVIEW)
         self.initial_time = time.time()
 
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\male_body.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\palm_tree.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
         # teapot2 = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_planes.pymesh", scene=self._scene)
