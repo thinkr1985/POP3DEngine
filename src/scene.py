@@ -3,6 +3,7 @@ from entity import Entity
 from logger import get_logger
 from shaders import DefaultShader
 from cameras import PerspectiveCamera
+from grid import Grid
 
 LOGGER = get_logger(__file__)
 
@@ -17,6 +18,7 @@ class Scene:
         self._cameras = dict()
         self._active_camera = None
 
+        self._grid = Grid(scene=self)
         self._init_scene()
 
     def __str__(self):
@@ -60,6 +62,10 @@ class Scene:
     @property
     def renderer(self):
         return self._renderer
+
+    @property
+    def grid(self):
+        return self._grid
 
     @property
     def default_shader(self) -> DefaultShader:

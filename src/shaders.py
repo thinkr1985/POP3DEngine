@@ -4,7 +4,7 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 
 from logger import get_logger
-from constants import DEFAULT_SHADER, DEFAULT_TEXTURES
+from constants import DEFAULT_SHADER, CONSTANT_SHADER, DEFAULT_TEXTURES
 from texture import TextureMap
 
 LOGGER = get_logger(__file__)
@@ -12,12 +12,13 @@ LOGGER = get_logger(__file__)
 
 class Shader:
     def __init__(self, shader_name: str, vert_src: str, frag_src: str, color_map_src: str = None,
-                 normal_map_src: str = None, **kwargs):
+                 normal_map_src: str = None, apply_default_maps=True, **kwargs):
         self.name = shader_name
         self.vert_src = vert_src
         self.frag_src = frag_src
         self.color_map_src = color_map_src
         self.normal_map_src = normal_map_src
+        self.apply_default_map = apply_default_maps
 
         self.color_texture_map = None
         self.normal_texture_map = None
@@ -33,14 +34,15 @@ class Shader:
         self._init_shader()
 
     def _init_shader(self):
-        if not self.color_map_src:
-            self.color_texture_map = TextureMap(os.path.join(
-                DEFAULT_TEXTURES, 'checker_board.png'), texture_slot=0)
-            self.color_texture_map.init_texture()
-        if not self.normal_map_src:
-            self.normal_texture_map = TextureMap(os.path.join(
-                DEFAULT_TEXTURES, 'checker_board_normal.png'), texture_slot=1)
-            self.normal_texture_map.init_texture()
+        if self.apply_default_map:
+            if not self.color_map_src:
+                self.color_texture_map = TextureMap(os.path.join(
+                    DEFAULT_TEXTURES, 'checker_board.png'), texture_slot=0)
+                self.color_texture_map.init_texture()
+            if not self.normal_map_src:
+                self.normal_texture_map = TextureMap(os.path.join(
+                    DEFAULT_TEXTURES, 'checker_board_normal.png'), texture_slot=1)
+                self.normal_texture_map.init_texture()
 
         vertex_shader = glCreateShader(GL_VERTEX_SHADER)
         fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
@@ -74,17 +76,22 @@ class Shader:
         glDetachShader(self.shader_program, fragment_shader)
 
     def default_vertex_shader_code(self):
+        LOGGER.info(f'Reading {self.vert_src}')
         with open(self.vert_src, 'r') as vp:
             return vp.readlines()
 
     def default_fragment_shader_code(self):
+        LOGGER.info(f'Reading {self.frag_src}')
         with open(self.frag_src, 'r') as fp:
             return fp.readlines()
 
     def _setup_attribute_pointer(self, attribute_name: str, stride: int, void_pointer: ctypes.c_void_p):
-        LOGGER.info(f'Setting up attribute {attribute_name} for shader {self.name} with stride {stride}')
+        LOGGER.info(f'Setting up attribute {attribute_name} for shader "{self.name}" with stride {stride}')
         pos_attrib_location = glGetAttribLocation(self.shader_program,
                                                   attribute_name)
+        if pos_attrib_location < 0:
+            LOGGER.warning(f'Attribute {attribute_name} skipped to set on shader "{self.name}"')
+            return
         glEnableVertexAttribArray(pos_attrib_location)
         glVertexAttribPointer(pos_attrib_location, 3, GL_FLOAT, GL_FALSE,
                               stride, void_pointer)
@@ -133,4 +140,24 @@ class DefaultShader(Shader):
                          frag_src=self.frag_src,
                          color_map_src=self.color_map_src,
                          normal_map_src=self.normal_map_src,
+                         kwargs=kwargs)
+
+
+class ConstantShader(Shader):
+    def __init__(self,
+                 shader_name: str = 'constant_shader',
+                 vert_src: str = os.path.join(
+                     CONSTANT_SHADER, 'vertex_shader.glsl'),
+                 frag_src: str = os.path.join(
+                     CONSTANT_SHADER, 'fragment_shader.glsl'),
+                 **kwargs):
+
+        self.shader_name = shader_name
+        self.vert_src = vert_src
+        self.frag_src = frag_src
+
+        super().__init__(shader_name=self.shader_name,
+                         vert_src=self.vert_src,
+                         frag_src=self.frag_src,
+                         apply_default_maps=False,
                          kwargs=kwargs)

@@ -14,13 +14,17 @@ class Renderer:
             'smooth_lines': False,
             'line_width': 1,
             'smooth_polygons': False,
-            'wireframe_mode': False,
+            'wireframe_mode': True,
             'point_mode': False,
             'point_size': 3,
             'flat_shading': False,
             'cull_faces': False,
             'multi_sample': False
         }
+
+        self.lines_VAO = glGenVertexArrays(1)
+        self.lines_indices = list()
+        self.lines_vertices = list()
 
         self.triangles_VAO = glGenVertexArrays(1)
         self.triangles_indices = list()
@@ -57,7 +61,7 @@ class Renderer:
                 f' {property_name} is not a Renderer property_name')
             return
         self._properties[property_name] = value
-        self.setup_renderer()
+        self.__init__renderer()
 
     @property
     def properties_dict(self) -> dict:
@@ -113,11 +117,11 @@ class Renderer:
 
         glEnable(GL_DEPTH_TEST)
         # glDepthFunc(GL_ALWAYS)
-        # glEnable(GL_DEBUG_OUTPUT)
+        glEnable(GL_DEBUG_OUTPUT)
         glEnable(GL_TEXTURE_2D)
 
     @staticmethod
-    def bind_buffer(vao, vbo, ebo, indices, vertices, entity):
+    def bind_buffer(vao, vbo, ebo, indices, vertices, entity, stride):
         glBindVertexArray(vao)
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices,
@@ -127,9 +131,27 @@ class Renderer:
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices,
                      GL_STATIC_DRAW)
 
-        entity.shader.setup_attribute_pointers(12 * 4)
+        entity.shader.setup_attribute_pointers(stride)
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
+
+    def add_lines_buffer(self, entity, indices_list: list, vertices_list: list, vbo, ebo):
+        element_index = len(set(self.lines_vertices))
+        new_index_buffer = [x + element_index for x in indices_list]
+
+        self.lines_indices.extend(new_index_buffer)
+        self.lines_vertices.extend(vertices_list)
+
+        indices = np.array(self.lines_indices, dtype=np.uint32)
+        vertices = np.array(self.lines_vertices, dtype=np.float32)
+
+        self.bind_buffer(self.lines_VAO,
+                         vbo,
+                         ebo,
+                         indices,
+                         vertices,
+                         entity,
+                         12)
 
     def add_triangle_buffer(self, entity, indices_list: list, vertices_list: list):
         element_index = len(set(self.triangles_indices))
@@ -146,7 +168,8 @@ class Renderer:
                          entity.triangles_EBO,
                          indices,
                          vertices,
-                         entity)
+                         entity,
+                         48)
 
     def add_quad_buffer(self, entity, indices_list: list, vertices_list: list):
         element_index = len(set(self.quads_indices))
@@ -163,7 +186,8 @@ class Renderer:
                          entity.quads_EBO,
                          indices,
                          vertices,
-                         entity)
+                         entity,
+                         48)
 
     def add_ngon_buffer(self, entity, indices_list: list, vertices_list: list):
         element_index = len(set(self.ngons_indices))
@@ -180,7 +204,19 @@ class Renderer:
                          entity.ngons_EBO,
                          indices,
                          vertices,
-                         entity)
+                         entity,
+                         48)
+
+    def _draw_lines(self):
+        if self.lines_indices:
+            # self.scene.default_shader.destroy()
+            # self.scene.grid.shader.use()
+            glBindVertexArray(self.lines_VAO)
+            glDrawElements(
+                GL_LINES, len(self.lines_indices), GL_UNSIGNED_INT, None
+            )
+            glBindVertexArray(0)
+            # self.scene.grid.shader.destroy()
 
     def _draw_triangles(self):
         if self.triangles_indices:
@@ -208,6 +244,10 @@ class Renderer:
 
     def render(self):
         self.scene.active_camera.use()
+
+        # drawing lines
+        self._draw_lines()
+
         self.scene.default_shader.use()
 
         # drawing triangles
