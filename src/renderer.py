@@ -14,7 +14,7 @@ class Renderer:
             'smooth_lines': False,
             'line_width': 1,
             'smooth_polygons': False,
-            'wireframe_mode': True,
+            'wireframe_mode': False,
             'point_mode': False,
             'point_size': 3,
             'flat_shading': False,

@@ -5,6 +5,7 @@ Building a 3D application / game engine completely from scratch with OpenGL and 
 
 ![screenshot](/src/icons/pop3dengine_sceenshot.png)
 ![screenshot](/src/icons/pop3dengine_sceenshot02.png)
+![screenshot](/src/icons/pop3dengine.gif)
 <p>
 <h3> Branches</h3>
 <b>main</b>    - This is master branch.
