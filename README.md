@@ -4,6 +4,7 @@ Python OpenGL PyQt 3D Engine
 Building a 3D application / game engine completely from scratch with OpenGL and PyQt.
 
 ![screenshot](/src/icons/pop3dengine_sceenshot.png)
+![screenshot](/src/icons/pop3dengine_sceenshot02.png)
 <p>
 <h3> Branches</h3>
 <b>main</b>    - This is master branch.

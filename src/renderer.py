@@ -14,7 +14,7 @@ class Renderer:
             'smooth_lines': False,
             'line_width': 1,
             'smooth_polygons': False,
-            'wireframe_mode': False,
+            'wireframe_mode': True,
             'point_mode': False,
             'point_size': 3,
             'flat_shading': False,
@@ -61,7 +61,7 @@ class Renderer:
                 f' {property_name} is not a Renderer property_name')
             return
         self._properties[property_name] = value
-        self.setup_renderer()
+        self.__init__renderer()
 
     @property
     def properties_dict(self) -> dict:
@@ -117,7 +117,7 @@ class Renderer:
 
         glEnable(GL_DEPTH_TEST)
         # glDepthFunc(GL_ALWAYS)
-        # glEnable(GL_DEBUG_OUTPUT)
+        glEnable(GL_DEBUG_OUTPUT)
         glEnable(GL_TEXTURE_2D)
 
     @staticmethod
