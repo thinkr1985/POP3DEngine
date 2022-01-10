@@ -128,3 +128,4 @@ dmypy.json
 
 *.idea
 *.pyc
+src/pymesh_examples/arab_man.pymesh
