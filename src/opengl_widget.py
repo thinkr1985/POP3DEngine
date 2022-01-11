@@ -1,6 +1,7 @@
 import time
 
 from PyQt6 import QtGui, QtWidgets, QtCore, QtOpenGLWidgets
+from PyQt6.QtOpenGL import QOpenGLFunctions_2_1
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
@@ -10,6 +11,7 @@ import primitives_
 from constants import ICONS_PATH
 from utilities import pymesh_reader
 from scene import Scene
+from heads_up_display import HeadsUpDisplay
 
 from logger import get_logger
 
@@ -37,7 +39,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.format.setDepthBufferSize(24)
         self.format.setStencilBufferSize(8)
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
+        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.TripleBuffer)
+
+        self.heads_up_display = HeadsUpDisplay(gl_widget=self)
         self._scene = None
 
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
@@ -70,85 +74,10 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.camera_far_plane_distance = 50.0
 
         self.grid_on = True
-        self._font = GLUT_BITMAP_HELVETICA_12
         self._connect()
 
     def _connect(self):
         pass
-
-    @staticmethod
-    def normalized_angle(angle):
-        while angle > np.pi:
-            angle -= 2.0 * np.pi
-
-        while angle < -np.pi:
-            angle += 2.0 * np.pi
-
-        return angle
-
-    def draw_heads_up_info(self):
-        self.draw_fps()
-        self.draw_opengl_version()
-
-    def draw_opengl_version(self):
-        primitives_.glut_print(2.0, 1.4,
-                               self._font,
-                              f"openGL Ver : {glGetString(GL_VERSION).decode('utf-8')}",
-                               [1.0, 1.0, 1.0]
-                               )
-
-    def draw_fps(self):
-        elapsed_time = time.time() - self.initial_time
-        self.nframes += 1
-        fps = round(self.nframes / elapsed_time, 2)
-        primitives_.glut_print(
-            2.0, 1.5, self._font,
-            f"FPS : {fps}",
-            [1.0, 1.0, 1.0])
-
-    def overlay_text(self):
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        # w = glutGet(self.width())
-        # h = glutGet(self.height())
-        # glOrtho(0, w, 0, h, -1, 1)
-
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-
-        glDisable(GL_DEPTH_TEST)
-
-        glDisable(GL_LIGHTING)
-        # glColor3f(1, 0, 0)
-        #
-        # glRasterPos2i(20, 20)
-        # glutBitmapString(self._font, "May String")
-        # void *font = GLUT_BITMAP_HELVETICA_18
-        #     for (char* c=string; *c != '\0'; c++)
-        #     {
-        #         glutBitmapCharacter(font, *c)
-        #     }
-
-        blending = False
-        if glIsEnabled(GL_BLEND):
-            blending = True
-
-        glColor3f(1.0, 0.0, 0.0)
-        glRasterPos2f(2.0, 1.5)
-        for character in "text":
-            glutBitmapCharacter(self._font, ord(character))
-
-        if not blending:
-            glDisable(GL_BLEND)
-
-        glEnable(GL_LIGHTING )
-        glEnable(GL_DEPTH_TEST)
-        glMatrixMode(GL_MODELVIEW)
-        glPopMatrix()
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
 
     @staticmethod
     def setup_fog():
@@ -186,6 +115,10 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.nframes += 1
         self._scene.renderer.render()
 
+        elapsed_time = time.time() - self.initial_time
+        fps = round(self.nframes / elapsed_time, 2)
+        self.heads_up_display.fps = fps
+        self.heads_up_display.draw()
         self.update()
         glFlush()
 
@@ -197,8 +130,8 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
                             GLUT_MULTISAMPLE |
                             GLUT_ALPHA |
                             GLUT_DEPTH |
-                            GLUT_CORE_PROFILE)
-
+                            GLUT_CORE_PROFILE,
+                            )
 
         self._scene = Scene(width=self.width(), height=self.height())
 
@@ -206,8 +139,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
 
+        self.heads_up_display._init_headsup_display()
         self.initial_time = time.time()
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\palm_tree_scene.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_objects.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
