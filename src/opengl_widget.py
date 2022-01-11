@@ -34,6 +34,8 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.setFormat(self.format)
         self.format.setVersion(3, 3)
         self.format.setSamples(4)
+        self.format.setDepthBufferSize(24)
+        self.format.setStencilBufferSize(8)
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
         self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
         self._scene = None
@@ -104,6 +106,74 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
             f"FPS : {fps}",
             [1.0, 1.0, 1.0])
 
+    def overlay_text(self):
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        # w = glutGet(self.width())
+        # h = glutGet(self.height())
+        # glOrtho(0, w, 0, h, -1, 1)
+
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+        glDisable(GL_DEPTH_TEST)
+
+        glDisable(GL_LIGHTING)
+        # glColor3f(1, 0, 0)
+        #
+        # glRasterPos2i(20, 20)
+        # glutBitmapString(self._font, "May String")
+        # void *font = GLUT_BITMAP_HELVETICA_18
+        #     for (char* c=string; *c != '\0'; c++)
+        #     {
+        #         glutBitmapCharacter(font, *c)
+        #     }
+
+        blending = False
+        if glIsEnabled(GL_BLEND):
+            blending = True
+
+        glColor3f(1.0, 0.0, 0.0)
+        glRasterPos2f(2.0, 1.5)
+        for character in "text":
+            glutBitmapCharacter(self._font, ord(character))
+
+        if not blending:
+            glDisable(GL_BLEND)
+
+        glEnable(GL_LIGHTING )
+        glEnable(GL_DEPTH_TEST)
+        glMatrixMode(GL_MODELVIEW)
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+
+    @staticmethod
+    def setup_fog():
+        glEnable(GL_FOG)
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        glFogfv(GL_FOG_COLOR, [0.5, 0.5, 0.5])
+        glHint(GL_FOG_HINT, GL_DONT_CARE)
+        glFogf(GL_FOG_START, 1.0)
+        glFogf(GL_FOG_END, 50.0)
+
+    @staticmethod
+    def setup_lights():
+        glEnable(GL_LIGHTING)
+        glEnable(GL_LIGHT0)
+        ambient_light = [2.0, 2.0, 2.0, 1.0]
+        diffuse_light = [0.8, 0.8, 0.8, 1.0]
+        specular_light = [0.5, 0.5, 0.5, 1.0]
+        position = [0.0, -10.0, 0.0, 1.0]
+
+        #Assign created components to GL_LIGHT0
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_light)
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_light)
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular_light)
+        glLightfv(GL_LIGHT0, GL_POSITION, position)
+
     def resizeGL(self, width: int, height: int) -> None:
         self._scene.active_camera.height = height
         self._scene.active_camera.width = width
@@ -115,12 +185,12 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
 
         self.nframes += 1
         self._scene.renderer.render()
+
         self.update()
         glFlush()
 
     def initializeGL(self) -> None:
         LOGGER.info('Initializing OpenGL')
-
         glutInit()
         glutInitDisplayMode(GLUT_RGBA |
                             GLUT_DOUBLE |
@@ -129,21 +199,16 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
                             GLUT_DEPTH |
                             GLUT_CORE_PROFILE)
 
+
         self._scene = Scene(width=self.width(), height=self.height())
 
         glClearDepth(1.0)
         glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
 
-        glEnable(GL_LIGHTING)
-        glMatrixMode(GL_MODELVIEW)
         self.initial_time = time.time()
-
         teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\palm_tree_scene.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
-
-        # teapot2 = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_planes.pymesh", scene=self._scene)
-        # self._scene.add_entity(teapot2)
-        # glfw.poll_events()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event.key() == QtCore.Qt.Key.Key_Up or event.key() == QtCore.Qt.Key.Key_W:
@@ -167,6 +232,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
                 self.grid_on = False
         if event.key() == QtCore.Qt.Key.Key_4:
             self._scene.renderer.set_property('wireframe_mode', True)
+
         if event.key() == QtCore.Qt.Key.Key_5:
             self._scene.renderer.set_property('wireframe_mode', False)
 

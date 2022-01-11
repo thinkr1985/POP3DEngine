@@ -107,6 +107,7 @@ class Renderer:
 
         if self.cull_faces:
             glEnable(GL_CULL_FACE)
+            glCullFace(GL_BACK)
         else:
             glDisable(GL_CULL_FACE)
 
@@ -115,10 +116,17 @@ class Renderer:
         else:
             glDisable(GL_MULTISAMPLE)
 
+        glEnable(GL_PROGRAM_POINT_SIZE)
+        glPointSize(5)
+
+        glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
+        glColorMaterial(GL_FRONT, GL_SPECULAR)
+        glShadeModel(GL_SMOOTH)
         glEnable(GL_DEPTH_TEST)
-        # glDepthFunc(GL_ALWAYS)
         glEnable(GL_DEBUG_OUTPUT)
         glEnable(GL_TEXTURE_2D)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST)
 
     @staticmethod
     def bind_buffer(vao, vbo, ebo, indices, vertices, entity, stride):
