@@ -1,6 +1,7 @@
 import time
 
 from PyQt6 import QtGui, QtWidgets, QtCore, QtOpenGLWidgets
+from PyQt6.QtOpenGL import QOpenGLFunctions_2_1
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
@@ -10,6 +11,7 @@ import primitives_
 from constants import ICONS_PATH
 from utilities import pymesh_reader
 from scene import Scene
+from heads_up_display import HeadsUpDisplay
 
 from logger import get_logger
 
@@ -34,8 +36,12 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.setFormat(self.format)
         self.format.setVersion(3, 3)
         self.format.setSamples(4)
+        self.format.setDepthBufferSize(24)
+        self.format.setStencilBufferSize(8)
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
+        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.TripleBuffer)
+
+        self.heads_up_display = HeadsUpDisplay(gl_widget=self)
         self._scene = None
 
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
@@ -68,41 +74,34 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.camera_far_plane_distance = 50.0
 
         self.grid_on = True
-        self._font = GLUT_BITMAP_HELVETICA_12
         self._connect()
 
     def _connect(self):
         pass
 
     @staticmethod
-    def normalized_angle(angle):
-        while angle > np.pi:
-            angle -= 2.0 * np.pi
+    def setup_fog():
+        glEnable(GL_FOG)
+        glFogi(GL_FOG_MODE, GL_LINEAR)
+        glFogfv(GL_FOG_COLOR, [0.5, 0.5, 0.5])
+        glHint(GL_FOG_HINT, GL_DONT_CARE)
+        glFogf(GL_FOG_START, 1.0)
+        glFogf(GL_FOG_END, 50.0)
 
-        while angle < -np.pi:
-            angle += 2.0 * np.pi
+    @staticmethod
+    def setup_lights():
+        glEnable(GL_LIGHTING)
+        glEnable(GL_LIGHT0)
+        ambient_light = [2.0, 2.0, 2.0, 1.0]
+        diffuse_light = [0.8, 0.8, 0.8, 1.0]
+        specular_light = [0.5, 0.5, 0.5, 1.0]
+        position = [0.0, -10.0, 0.0, 1.0]
 
-        return angle
-
-    def draw_heads_up_info(self):
-        self.draw_fps()
-        self.draw_opengl_version()
-
-    def draw_opengl_version(self):
-        primitives_.glut_print(2.0, 1.4,
-                               self._font,
-                              f"openGL Ver : {glGetString(GL_VERSION).decode('utf-8')}",
-                               [1.0, 1.0, 1.0]
-                               )
-
-    def draw_fps(self):
-        elapsed_time = time.time() - self.initial_time
-        self.nframes += 1
-        fps = round(self.nframes / elapsed_time, 2)
-        primitives_.glut_print(
-            2.0, 1.5, self._font,
-            f"FPS : {fps}",
-            [1.0, 1.0, 1.0])
+        #Assign created components to GL_LIGHT0
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_light)
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_light)
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular_light)
+        glLightfv(GL_LIGHT0, GL_POSITION, position)
 
     def resizeGL(self, width: int, height: int) -> None:
         self._scene.active_camera.height = height
@@ -115,35 +114,35 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
 
         self.nframes += 1
         self._scene.renderer.render()
+
+        elapsed_time = time.time() - self.initial_time
+        fps = round(self.nframes / elapsed_time, 2)
+        self.heads_up_display.fps = fps
+        self.heads_up_display.draw()
         self.update()
         glFlush()
 
     def initializeGL(self) -> None:
         LOGGER.info('Initializing OpenGL')
-
         glutInit()
         glutInitDisplayMode(GLUT_RGBA |
                             GLUT_DOUBLE |
                             GLUT_MULTISAMPLE |
                             GLUT_ALPHA |
                             GLUT_DEPTH |
-                            GLUT_CORE_PROFILE)
+                            GLUT_CORE_PROFILE,
+                            )
 
         self._scene = Scene(width=self.width(), height=self.height())
 
         glClearDepth(1.0)
         glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
 
-        glEnable(GL_LIGHTING)
-        glMatrixMode(GL_MODELVIEW)
+        self.heads_up_display._init_headsup_display()
         self.initial_time = time.time()
-
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\teapot_high.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_objects.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
-
-        # teapot2 = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_planes.pymesh", scene=self._scene)
-        # self._scene.add_entity(teapot2)
-        # glfw.poll_events()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event.key() == QtCore.Qt.Key.Key_Up or event.key() == QtCore.Qt.Key.Key_W:
@@ -167,6 +166,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
                 self.grid_on = False
         if event.key() == QtCore.Qt.Key.Key_4:
             self._scene.renderer.set_property('wireframe_mode', True)
+
         if event.key() == QtCore.Qt.Key.Key_5:
             self._scene.renderer.set_property('wireframe_mode', False)
 
