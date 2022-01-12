@@ -86,7 +86,7 @@ class Shader:
             return fp.readlines()
 
     def _setup_attribute_pointer(self, attribute_name: str, stride: int, void_pointer: ctypes.c_void_p):
-        LOGGER.info(f'Setting up attribute {attribute_name} for shader "{self.name}" with stride {stride}')
+        # LOGGER.info(f'Setting up attribute {attribute_name} for shader "{self.name}" with stride {stride}')
         pos_attrib_location = glGetAttribLocation(self.shader_program,
                                                   attribute_name)
         if pos_attrib_location < 0:

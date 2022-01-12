@@ -1,7 +1,6 @@
 import time
 
 from PyQt6 import QtGui, QtWidgets, QtCore, QtOpenGLWidgets
-from PyQt6.QtOpenGL import QOpenGLFunctions_2_1
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
@@ -38,8 +37,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.format.setSamples(4)
         self.format.setDepthBufferSize(24)
         self.format.setStencilBufferSize(8)
+        self.format.setSwapInterval(0)  # Turning vsync off.
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.TripleBuffer)
+        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
 
         self.heads_up_display = HeadsUpDisplay(gl_widget=self)
         self._scene = None
@@ -60,8 +60,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.rotate_cursor = QtGui.QCursor(self.rotate_pixmap)
 
         self.initial_time = time.time()
+        self.prev_time = 0
 
-        self.nframes = 1
+        self.frames_counter = 1
         self.mouse_drag = False
         self.mouse_pos = QtCore.QPoint(0, 0)
         self.pan_mode = False
@@ -103,6 +104,20 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         glLightfv(GL_LIGHT0, GL_SPECULAR, specular_light)
         glLightfv(GL_LIGHT0, GL_POSITION, position)
 
+    def calculate_fps(self):
+        current_time = glutGet(GLUT_ELAPSED_TIME)
+        time_diff = current_time - self.prev_time
+
+        if time_diff >= 1000:
+            self.heads_up_display.fps = self.frames_counter
+            self.heads_up_display.millisecond_per_frame = round((self.frames_counter / 1000), 2)
+            self.frames_counter = 0
+            self.prev_time = current_time
+        else:
+            self.frames_counter += 1
+
+        self.heads_up_display.draw()
+
     def resizeGL(self, width: int, height: int) -> None:
         self._scene.active_camera.height = height
         self._scene.active_camera.width = width
@@ -112,13 +127,8 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
 
-        self.nframes += 1
         self._scene.renderer.render()
-
-        elapsed_time = time.time() - self.initial_time
-        fps = round(self.nframes / elapsed_time, 2)
-        self.heads_up_display.fps = fps
-        self.heads_up_display.draw()
+        self.calculate_fps()
         self.update()
         glFlush()
 
@@ -132,7 +142,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
                             GLUT_DEPTH |
                             GLUT_CORE_PROFILE,
                             )
-
+        glutInitContextProfile(GLUT_CORE_PROFILE)
         self._scene = Scene(width=self.width(), height=self.height())
 
         glClearDepth(1.0)
@@ -141,7 +151,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
 
         self.heads_up_display._init_headsup_display()
         self.initial_time = time.time()
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\multiple_objects.pymesh", scene=self._scene)
+        self.prev_time = glutGet(GLUT_ELAPSED_TIME)
+
+        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\plane.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
