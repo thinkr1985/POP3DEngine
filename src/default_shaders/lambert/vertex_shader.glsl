@@ -9,7 +9,9 @@ out vec3 newColor;
 out vec3 normalMap;
 out vec2 outTexCoords;
 
+
 uniform mat4 model;
+uniform mat4 view;
 uniform mat4 projection;
 
 void main()

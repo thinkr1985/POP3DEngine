@@ -32,20 +32,18 @@ def get_logger(module=__file__, debug_level=logging.DEBUG):
         os.makedirs(TEMP_DIR)
 
     logger_name = os.path.split(module)[-1].split(".")[0]
-
-    # formatter = ColoredFormatter()
+    format_ = '%(levelname)7s - %(asctime)s - %(filename)s - %(funcName)s - %(message)s'
     date_fmt = "%d-%m-%y %H:%M:%S"
-    formatter = logging.Formatter(
-        '%(levelname)s - %(asctime)s - %(filename)s - %(funcName)s - %(message)s',
-        datefmt=date_fmt
-    )
+
+    log_file_formatter = logging.Formatter(format_, datefmt=date_fmt)
+    text_stream_formatter = CustomFormatter(fmt=format_)
 
     log_stream_handler = logging.StreamHandler()
-    log_stream_handler.setFormatter(formatter)
+    log_stream_handler.setFormatter(text_stream_formatter)
     log_stream_handler.setLevel(debug_level)
 
     log_file_handler = logging.FileHandler(LOG_FILE)
-    log_file_handler.setFormatter(formatter)
+    log_file_handler.setFormatter(log_file_formatter)
     log_file_handler.setLevel(logging.DEBUG)
 
     logger_ = logging.getLogger(logger_name)
@@ -56,47 +54,29 @@ def get_logger(module=__file__, debug_level=logging.DEBUG):
     return logger_
 
 
-class ColoredFormatter(logging.Formatter):
-    """Custom logging Formatter for coloured stream logging."""
+class CustomFormatter(logging.Formatter):
+    """Logging colored formatter,
+     adapted from https://stackoverflow.com/a/56944256/3638629"""
 
-    BLUE = '\033[1;34m'
-    GREEN = '\033[1;32m'
-    ORANGE = '\033[0;33m'
-    RED = '\033[1;31m'
+    grey = '\x1b[38;21m'
+    blue = '\x1b[38;5;39m'
+    yellow = '\x1b[38;5;226m'
+    red = '\x1b[38;5;196m'
+    bold_red = '\x1b[31;1m'
+    reset = '\x1b[0m'
 
-    def __init__(self, *args, **kwargs):
-        """Init.
-
-        Args:
-            message_only (bool): If True, show only the log message,
-                otherwise show also logger name and log level. Defaults
-                to False.
-        """
-        super(ColoredFormatter, self).__init__(*args, **kwargs)
-        self.log_template = (
-            '{color}%(levelname)s\t%(asctime)s-%(name)s-%(funcName)s-\t%(message)s'
-        )
-        self.datefmt = '%d-%b-%y-%H:%M:%S'
+    def __init__(self, fmt):
+        super().__init__()
+        self.fmt = fmt
+        self.FORMATS = {
+            logging.DEBUG: self.grey + self.fmt + self.reset,
+            logging.INFO: self.blue + self.fmt + self.reset,
+            logging.WARNING: self.yellow + self.fmt + self.reset,
+            logging.ERROR: self.red + self.fmt + self.reset,
+            logging.CRITICAL: self.bold_red + self.fmt + self.reset
+        }
 
     def format(self, record):
-        """Format the log record with a different colour for each log level.
-
-        Args:
-            record (logging.LogRecord): The log record to format.
-
-        Returns:
-            str: The formatted log record.
-        """
-        # Replace the original format with one customized by logging level
-        if record.levelno == logging.DEBUG:
-            self._fmt = self.log_template.format(color=self.GREEN)
-        elif record.levelno == logging.INFO:
-            self._fmt = self.log_template.format(color=self.BLUE)
-        elif record.levelno == logging.WARNING:
-            self._fmt = self.log_template.format(color=self.ORANGE)
-        elif record.levelno == logging.ERROR:
-            self._fmt = self.log_template.format(color=self.RED)
-
-        result = super(ColoredFormatter, self).format(record)
-
-        return result
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)

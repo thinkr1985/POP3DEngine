@@ -4,13 +4,15 @@ from OpenGL.GL import *
 
 from logger import get_logger
 from vertex import VertexSet
+from transformation import Transformations
 
 LOGGER = get_logger(__file__)
 
 
 class Entity:
     def __init__(self, entity_name: str, face_sets: list, scene,
-                 user_attributes: dict = None, shader=None, **kwargs):
+                 transformations: list = None, user_attributes: dict = None,
+                 shader=None, **kwargs):
         self._name = entity_name
         self._face_sets = face_sets
         self._user_attributes = user_attributes or dict()
@@ -18,6 +20,8 @@ class Entity:
         self._uid = uuid.uuid1()
         self._shader = shader or self._scene.default_shader
         self._vertex_sets = list()
+        self._transformations = Transformations(
+            entity=self, transformations=transformations)
 
         self.triangles_VBO = glGenBuffers(1)
         self.triangles_EBO = glGenBuffers(1)
@@ -58,6 +62,10 @@ class Entity:
         self._uid = uuid.uuid1()
 
     @property
+    def transformations(self) -> Transformations:
+        return self._transformations
+
+    @property
     def scene(self):
         return self._scene
 
@@ -80,3 +88,12 @@ class Entity:
     @property
     def shader(self):
         return self._shader
+
+    def destroy(self):
+        glDeleteBuffers(1, (self.triangles_VBO,))
+        glDeleteBuffers(1, (self.quads_VBO,))
+        glDeleteBuffers(1, (self.ngons_VBO,))
+
+        glDeleteBuffers(1, (self.triangles_EBO,))
+        glDeleteBuffers(1, (self.quads_EBO,))
+        glDeleteBuffers(1, (self.ngons_EBO,))

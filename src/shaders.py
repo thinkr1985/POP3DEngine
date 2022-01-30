@@ -28,6 +28,7 @@ class Shader:
             'normalTex': ctypes.c_void_p(12),
             'color': ctypes.c_void_p(24),
             'inTexCoords': ctypes.c_void_p(40),
+            'lightColor': [1.0, 1.0, 1.0]
         }
 
         self.shader_program = glCreateProgram()
@@ -104,7 +105,11 @@ class Shader:
                 void_pointer=pointer)
 
     def use(self):
+        if not glGetProgramiv(self.shader_program, GL_LINK_STATUS):
+            glLinkProgram(self.shader_program)
+
         glUseProgram(self.shader_program)
+
         if self.color_texture_map:
             self.color_texture_map.use()
         if self.normal_texture_map:
@@ -112,6 +117,7 @@ class Shader:
 
     def destroy(self):
         glDeleteProgram(self.shader_program)
+
         if self.color_texture_map:
             self.color_texture_map.destroy()
         if self.normal_texture_map:

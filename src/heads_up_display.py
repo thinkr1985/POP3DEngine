@@ -56,9 +56,10 @@ class HeadsUpDisplay:
             return "On"
 
     def glut_print(self, text) -> None:
-        glColor3f(self._attribute_color[0], self._attribute_color[1], self._attribute_color[2])
-        glRasterPos2f(0, self._gl_widget.height() - 20)
-        glutBitmapString(self._font, text.encode())
+        # TODO this needs to change to something else.
+
+        # glutBitmapString(self._font, text.encode())
+        pass
 
     def _init_headsup_display(self):
         self._opengl_version = glGetString(GL_VERSION).decode('utf-8')
@@ -75,18 +76,6 @@ class HeadsUpDisplay:
 
     def draw(self):
         glDisable(GL_DEPTH_TEST)
-        glDisable(GL_LIGHTING)
-        glMatrixMode(GL_PROJECTION) # switch to 2D projection
-        glPushMatrix()  # save matrix state
-        glLoadIdentity()    # reset
-
-        # set 2D projection matrix
-        glOrtho(0, self._gl_widget.width(), 0, self._gl_widget.height(), -1, 1)
-
-        glMatrixMode(GL_MODELVIEW)  # switch to model view matrix
-        glPushMatrix()  # save state
-        glLoadIdentity()    # reset
-
         blending = False
         if glIsEnabled(GL_BLEND):
             blending = True
@@ -96,10 +85,4 @@ class HeadsUpDisplay:
         if not blending:
             glDisable(GL_BLEND)
 
-        glEnable(GL_LIGHTING)
         glEnable(GL_DEPTH_TEST)
-
-        glMatrixMode(GL_PROJECTION) # switch back to 3D projection
-        glPopMatrix()   # retrieve matrix state
-        glMatrixMode(GL_MODELVIEW)  # switch to model matrix view
-        glPopMatrix()   # retrieve matrix

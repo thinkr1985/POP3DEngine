@@ -1,9 +1,11 @@
 import time
 
+from OpenGL.raw.GL.NVX.gpu_memory_info import *
 from PyQt6 import QtGui, QtWidgets, QtCore, QtOpenGLWidgets
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
+from OpenGL.GLU import *
 from glfw import *
 import numpy as np
 import primitives_
@@ -11,6 +13,7 @@ from constants import ICONS_PATH
 from utilities import pymesh_reader
 from scene import Scene
 from heads_up_display import HeadsUpDisplay
+from renderer import GLSettings
 
 from logger import get_logger
 
@@ -30,22 +33,30 @@ class _OpenGLViewer(QtWidgets.QWidget):
 class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # setting Format of the openGL context
         self.format = QtGui.QSurfaceFormat()
-        self.setFormat(self.format)
-        self.format.setVersion(3, 3)
+        self.gl_settings = GLSettings(gl_widget=self)
+
+        # setting Format of the openGL context
+        self.format.setRenderableType(QtGui.QSurfaceFormat.renderableType(self.format).OpenGL)
         self.format.setSamples(4)
         self.format.setDepthBufferSize(24)
-        self.format.setStencilBufferSize(8)
         self.format.setSwapInterval(0)  # Turning vsync off.
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
         self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
+
+        # defining color-space
+        self.color_space = QtGui.QColorSpace(QtGui.QColorSpace.NamedColorSpace.SRgbLinear)
+        self.format.setColorSpace(self.color_space)
+
+        self.setFormat(self.format) # make sure to set format after you defined all the parameters of your format.
+        QtGui.QSurfaceFormat.setDefaultFormat(self.format)
+        self.makeCurrent()
 
         self.heads_up_display = HeadsUpDisplay(gl_widget=self)
         self._scene = None
 
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
-        self.viewport_color = QtGui.QColor.fromCmykF(0.39, 0.39, 0.0, 0.0)
+        self.viewport_color = [0.3, 0.3, 0.3, 1.0]
         self.grid = True
         self.setMinimumSize(QtCore.QSize(120, 120))
 
@@ -80,6 +91,19 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
     def _connect(self):
         pass
 
+    def get_gpu_usage(self):
+        try:
+            # print(glGetString(GL_VENDOR))
+            if "NVIDIA" in glGetString(GL_VENDOR).decode('utf-8'):
+                total_mem_kb = glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX)
+                free_mem_kb = glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)
+                return f'{round((free_mem_kb / total_mem_kb) * 100, 2)}%'
+            else:
+                LOGGER.error('Unable to fetch GPU usage')
+                return 'N/A'
+        except:
+            pass
+
     @staticmethod
     def setup_fog():
         glEnable(GL_FOG)
@@ -108,52 +132,51 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         current_time = glutGet(GLUT_ELAPSED_TIME)
         time_diff = current_time - self.prev_time
 
-        if time_diff >= 1000:
-            self.heads_up_display.fps = self.frames_counter
-            self.heads_up_display.millisecond_per_frame = round((self.frames_counter / 1000), 2)
-            self.frames_counter = 0
+        delta = time_diff
+        if delta >= 1000:
+            frame_rate = int(1000.0 * self.frames_counter / delta)
+            self.heads_up_display.fps = frame_rate
             self.prev_time = current_time
-        else:
-            self.frames_counter += 1
+            self.frames_counter = -1
+            frame_time = round(float(1000.0 / frame_rate), 2)
+            self.heads_up_display.millisecond_per_frame = frame_time
 
+        self.frames_counter += 1
         self.heads_up_display.draw()
 
     def resizeGL(self, width: int, height: int) -> None:
         self._scene.active_camera.height = height
         self._scene.active_camera.width = width
+        glViewport(0, 0, width, height)
+        self.update()
 
     def paintGL(self) -> None:
-        glClearColor(0.3, 0.3, 0.3, 0.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glLoadIdentity()
+        glClearColor(self.viewport_color[0], self.viewport_color[1],
+                     self.viewport_color[2], self.viewport_color[3])
+
+        glClear(
+            GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT
+            )
 
         self._scene.renderer.render()
-        self.calculate_fps()
+        # self.calculate_fps()
+
         self.update()
         glFlush()
+        self.doneCurrent()
 
     def initializeGL(self) -> None:
-        LOGGER.info('Initializing OpenGL')
-        glutInit()
-        glutInitDisplayMode(GLUT_RGBA |
-                            GLUT_DOUBLE |
-                            GLUT_MULTISAMPLE |
-                            GLUT_ALPHA |
-                            GLUT_DEPTH |
-                            GLUT_CORE_PROFILE,
-                            )
-        glutInitContextProfile(GLUT_CORE_PROFILE)
+        LOGGER.info('Initializing OpenGLWidget')
+        self.gl_settings.set_glrendersettings()
         self._scene = Scene(width=self.width(), height=self.height())
 
         glClearDepth(1.0)
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
 
         self.heads_up_display._init_headsup_display()
         self.initial_time = time.time()
         self.prev_time = glutGet(GLUT_ELAPSED_TIME)
 
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\plane.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\cube.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -177,10 +200,10 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
             else:
                 self.grid_on = False
         if event.key() == QtCore.Qt.Key.Key_4:
-            self._scene.renderer.set_property('wireframe_mode', True)
+            self.gl_settings.set_property('wireframe_mode', True)
 
         if event.key() == QtCore.Qt.Key.Key_5:
-            self._scene.renderer.set_property('wireframe_mode', False)
+            self.gl_settings.set_property('wireframe_mode', False)
 
         super(_OpenGLWidget, self).keyPressEvent(event)
 

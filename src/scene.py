@@ -1,9 +1,10 @@
 from renderer import Renderer
 from entity import Entity
 from logger import get_logger
-from shaders import DefaultShader
+from shaders import DefaultShader, ConstantShader
 from cameras import PerspectiveCamera
 from grid import Grid
+from lights import AmbientLight
 
 LOGGER = get_logger(__file__)
 
@@ -14,10 +15,12 @@ class Scene:
         self._height = 512
         self._entities = dict()
         self._default_shader: DefaultShader = DefaultShader()
+        self.test_shader = ConstantShader()
         self._renderer = Renderer(self)
         self._cameras = dict()
         self._active_camera = None
 
+        self.ambient_light = AmbientLight(scene=self, color=[1.0, 1.0, 1.0])
         self._grid = Grid(scene=self)
         self._init_scene()
 
@@ -34,6 +37,10 @@ class Scene:
                                                 near_clip=0.1,
                                                 camera_name='persp')
         self._active_camera = camera
+
+    @property
+    def grid(self):
+        return self._grid
 
     @property
     def width(self):
@@ -62,10 +69,6 @@ class Scene:
     @property
     def renderer(self):
         return self._renderer
-
-    @property
-    def grid(self):
-        return self._grid
 
     @property
     def default_shader(self) -> DefaultShader:

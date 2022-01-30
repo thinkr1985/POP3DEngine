@@ -26,7 +26,7 @@ class Camera:
         self._focal_length = focal_length
         self._width = width
         self._height = height
-        self._far_clip = far_clip,
+        self._far_clip = far_clip
         self._near_clip = near_clip
         self._camera_type = camera_type
         self._camera_name = camera_name
@@ -213,13 +213,15 @@ class Camera:
             fovy=self._focal_length,
             aspect=self.aspect_ratio,
             near=self._near_clip,
-            far=self._far_clip[0],
+            far=self._far_clip,
             dtype=np.float32
         )
 
         position_location = glGetUniformLocation(self.shader.shader_program, "projection")
         glUniformMatrix4fv(position_location, 1, GL_FALSE, transform)
         self._model_matrix_location = glGetUniformLocation(self.shader.shader_program, "model")
+
+        # self.shader.destroy()
 
     def reset_transformations(self):
         self._translation = [0, 0, -2]
@@ -247,6 +249,9 @@ class Camera:
         )
         glUniformMatrix4fv(self._model_matrix_location, 1, GL_FALSE,
                            model_matrix)
+
+    def destroy(self):
+        self._scene.remove_camera(camera_name=self._camera_name)
 
 
 class PerspectiveCamera(Camera):
