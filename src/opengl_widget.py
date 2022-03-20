@@ -1,5 +1,6 @@
+import os
 import time
-
+from pygltflib import GLTF2, Scene
 from OpenGL.raw.GL.NVX.gpu_memory_info import *
 from PyQt6 import QtGui, QtWidgets, QtCore, QtOpenGLWidgets
 from OpenGL.GL import *
@@ -7,13 +8,14 @@ from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
 from OpenGL.GLU import *
 from glfw import *
-import numpy as np
-import primitives_
-from constants import ICONS_PATH
+import psutil
+
+
+from constants import ICONS_PATH, PS_PROCESS
 from utilities import pymesh_reader
 from scene import Scene
 from heads_up_display import HeadsUpDisplay
-from renderer import GLSettings
+from gl_config import GLSettings
 
 from logger import get_logger
 
@@ -42,7 +44,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.format.setDepthBufferSize(24)
         self.format.setSwapInterval(0)  # Turning vsync off.
         self.format.setProfile(QtGui.QSurfaceFormat.OpenGLContextProfile.CoreProfile)
-        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.DoubleBuffer)
+        self.format.setSwapBehavior(QtGui.QSurfaceFormat.SwapBehavior.TripleBuffer)
 
         # defining color-space
         self.color_space = QtGui.QColorSpace(QtGui.QColorSpace.NamedColorSpace.SRgbLinear)
@@ -91,7 +93,8 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
     def _connect(self):
         pass
 
-    def get_gpu_usage(self):
+    @staticmethod
+    def get_gpu_usage():
         try:
             # print(glGetString(GL_VENDOR))
             if "NVIDIA" in glGetString(GL_VENDOR).decode('utf-8'):
@@ -101,47 +104,35 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
             else:
                 LOGGER.error('Unable to fetch GPU usage')
                 return 'N/A'
-        except:
-            pass
-
-    @staticmethod
-    def setup_fog():
-        glEnable(GL_FOG)
-        glFogi(GL_FOG_MODE, GL_LINEAR)
-        glFogfv(GL_FOG_COLOR, [0.5, 0.5, 0.5])
-        glHint(GL_FOG_HINT, GL_DONT_CARE)
-        glFogf(GL_FOG_START, 1.0)
-        glFogf(GL_FOG_END, 50.0)
-
-    @staticmethod
-    def setup_lights():
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
-        ambient_light = [2.0, 2.0, 2.0, 1.0]
-        diffuse_light = [0.8, 0.8, 0.8, 1.0]
-        specular_light = [0.5, 0.5, 0.5, 1.0]
-        position = [0.0, -10.0, 0.0, 1.0]
-
-        #Assign created components to GL_LIGHT0
-        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient_light)
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse_light)
-        glLightfv(GL_LIGHT0, GL_SPECULAR, specular_light)
-        glLightfv(GL_LIGHT0, GL_POSITION, position)
+        except Exception as error_txt:
+            LOGGER.error(error_txt)
+            return 0
 
     def calculate_fps(self):
         current_time = glutGet(GLUT_ELAPSED_TIME)
         time_diff = current_time - self.prev_time
+        cpu_usage = round(PS_PROCESS.cpu_percent(), 2)
+        memory_used = round(PS_PROCESS.memory_percent(), 2)
+        gpu_usage = self.get_gpu_usage()
 
         delta = time_diff
         if delta >= 1000:
             frame_rate = int(1000.0 * self.frames_counter / delta)
-            self.heads_up_display.fps = frame_rate
+            self.heads_up_display.fps = frame_rate or 0.1
             self.prev_time = current_time
             self.frames_counter = -1
+            if frame_rate ==0:
+                frame_rate = 0.1
             frame_time = round(float(1000.0 / frame_rate), 2)
             self.heads_up_display.millisecond_per_frame = frame_time
+            title_string = 'POP3D Viewer F.P.S.: {}'.format(round(frame_rate / frame_time, 2))
+            title_string += f' ,CPU used: {cpu_usage}%'
+            title_string += f' ,RAM used: {memory_used}%'
+            title_string += f' ,GPU used: {gpu_usage}'
+            self.setWindowTitle(title_string)
 
         self.frames_counter += 1
+
         self.heads_up_display.draw()
 
     def resizeGL(self, width: int, height: int) -> None:
@@ -159,7 +150,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
             )
 
         self._scene.renderer.render()
-        # self.calculate_fps()
+        self.calculate_fps()
 
         self.update()
         glFlush()
@@ -168,15 +159,15 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
     def initializeGL(self) -> None:
         LOGGER.info('Initializing OpenGLWidget')
         self.gl_settings.set_glrendersettings()
+        self.gl_settings.print_gl_info()
         self._scene = Scene(width=self.width(), height=self.height())
 
         glClearDepth(1.0)
-
         self.heads_up_display._init_headsup_display()
         self.initial_time = time.time()
         self.prev_time = glutGet(GLUT_ELAPSED_TIME)
 
-        teapot = pymesh_reader.import_pymesh("E:\\projects\\3d_viewer\\src\\pymesh_examples\\cube.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh(r"E:\GitHub\POP3DEngine\src\pymesh_examples\war_jeep.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
@@ -195,7 +186,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         if event.key() == QtCore.Qt.Key.Key_R:
             self._scene.render_camera.reset_transformations()
         if event.key() == QtCore.Qt.Key.Key_G:
-            if self.grid_on == False:
+            if not self.grid_on:
                 self.grid_on = True
             else:
                 self.grid_on = False

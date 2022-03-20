@@ -123,7 +123,7 @@ class DefaultShader(Shader):
                  vert_src: str = os.path.join(
                      DEFAULT_SHADER, 'vertex_shader.glsl'),
                  frag_src: str = os.path.join(
-                     DEFAULT_SHADER, 'fragment_shader.glsl'),
+                     DEFAULT_SHADER, 'geometry_shader.glsl'),
                  color_map_src: str = None,
                  normal_map_src: str = None,
                  **kwargs):

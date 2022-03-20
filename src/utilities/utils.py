@@ -51,16 +51,11 @@ def read_pymesh_file(pymesh_file_path: str, object_name: str = None) -> list:
         if object_name:
             if mesh != object_name:
                 continue
-
-        user_attributes = mesh_data.get('user_attributes')
-
-        face_sets = mesh_data.get('face_sets')
-
         entity_dict = {
-                        'face_sets': face_sets,
                         'entity_name': mesh,
                         'entity_type': type_,
-                        'user_attributes': user_attributes,
+                        'buffers': mesh_data['buffers'],
+                        'user_attributes': mesh_data.get('user_attributes'),
                         'source_files': pymesh_file_path
                 }
         entities.append(entity_dict)

@@ -35,7 +35,9 @@ class Camera:
         self._identity_matrix = pyrr.matrix44.create_identity(dtype=np.float32)
         self._translation = [0, 0, -2]
         self._rotation = [-30, 0, 0]
-        self._model_matrix_location = None
+        self._model_uniform_location = None
+        self._project_uniform_location = None
+        self._view_uniform_location = None
 
         self._init_camera()
 
@@ -73,7 +75,6 @@ class Camera:
 
     def _init_camera(self):
         self._scene.add_camera(self)
-        self.generate_matrix_locations()
 
     @property
     def focal_length(self):
@@ -204,24 +205,16 @@ class Camera:
         return self._identity_matrix
 
     @property
-    def model_matrix_location(self):
-        return self._model_matrix_location
+    def model_uniform_location(self) -> int:
+        return self._model_uniform_location
 
-    def generate_matrix_locations(self):
-        self.shader.use()
-        transform = pyrr.matrix44.create_perspective_projection_matrix(
-            fovy=self._focal_length,
-            aspect=self.aspect_ratio,
-            near=self._near_clip,
-            far=self._far_clip,
-            dtype=np.float32
-        )
+    @property
+    def project_uniform_location(self) -> int:
+        return self._project_uniform_location
 
-        position_location = glGetUniformLocation(self.shader.shader_program, "projection")
-        glUniformMatrix4fv(position_location, 1, GL_FALSE, transform)
-        self._model_matrix_location = glGetUniformLocation(self.shader.shader_program, "model")
-
-        # self.shader.destroy()
+    @property
+    def view_uniform_location(self) -> int:
+        return self._view_uniform_location
 
     def reset_transformations(self):
         self._translation = [0, 0, -2]
@@ -233,7 +226,14 @@ class Camera:
             roll:rotation around z axis
             yaw: rotation around y axis
         """
-        self.generate_matrix_locations()
+
+        transform_matrix = pyrr.matrix44.create_perspective_projection_matrix(
+            fovy=self._focal_length,
+            aspect=self.aspect_ratio,
+            near=self._near_clip,
+            far=self._far_clip,
+            dtype=np.float32
+        )
 
         rotation_matrix = pyrr.matrix44.multiply(
             m1=self._identity_matrix,
@@ -247,8 +247,16 @@ class Camera:
                 vec=np.array(self._translation), dtype=np.float32
             )
         )
-        glUniformMatrix4fv(self._model_matrix_location, 1, GL_FALSE,
-                           model_matrix)
+        for shader in self.scene.shaders.values():
+            shader.use()
+            self._project_uniform_location = glGetUniformLocation(shader.shader_program, "projection")
+            self._model_uniform_location = glGetUniformLocation(shader.shader_program, "model")
+
+            glUniformMatrix4fv(self.project_uniform_location, 1, GL_FALSE,
+                               transform_matrix)
+
+            glUniformMatrix4fv(self._model_uniform_location, 1, GL_FALSE,
+                               model_matrix)
 
     def destroy(self):
         self._scene.remove_camera(camera_name=self._camera_name)

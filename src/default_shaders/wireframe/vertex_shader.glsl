@@ -1,16 +1,7 @@
-#version 330 core
-
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec3 color;
-
-out vec3 newColor;
-
-uniform mat4 model;
-uniform mat4 projection;
+#version 410 core
+in vec4 gxl3d_Position;
 
 void main()
 {
-    gl_Position = projection * model * vec4(position, 1.0);
-    newColor = color;
+  gl_Position = gxl3d_Position;
 }
-

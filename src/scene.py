@@ -1,9 +1,12 @@
+import numpy as np
+from OpenGL.GL import *
 from renderer import Renderer
 from entity import Entity
 from logger import get_logger
 from shaders import DefaultShader, ConstantShader
 from cameras import PerspectiveCamera
 from grid import Grid
+import lights
 from lights import AmbientLight
 
 LOGGER = get_logger(__file__)
@@ -13,14 +16,18 @@ class Scene:
     def __init__(self, **kwargs):
         self._width = 512
         self._height = 512
+
         self._entities = dict()
-        self._default_shader: DefaultShader = DefaultShader()
-        self.test_shader = ConstantShader()
+        self._shaders = dict()
+        self._lights = dict()
+        self._default_shader: DefaultShader = DefaultShader(scene=self)
+        self.constant_shader = ConstantShader(scene=self)
         self._renderer = Renderer(self)
         self._cameras = dict()
         self._active_camera = None
 
-        self.ambient_light = AmbientLight(scene=self, color=[1.0, 1.0, 1.0])
+        self.ambient_light = AmbientLight(scene=self, color=[1.0, 1.0, 1.0], light_name='default_ambient_light')
+        self.add_entity(self.ambient_light, update_uid=False)
         self._grid = Grid(scene=self)
         self._init_scene()
 
@@ -74,6 +81,32 @@ class Scene:
     def default_shader(self) -> DefaultShader:
         return self._default_shader
 
+    @property
+    def shaders(self) -> dict:
+        return self._shaders
+
+    @property
+    def lights(self) -> dict:
+        return self._lights
+
+    def add_scene_shader(self, shader):
+        if shader.name not in self._shaders:
+            self._shaders.update({shader.name: shader})
+        else:
+            LOGGER.error(
+                f'Failed to add shader {shader.name} to scene'
+                f' since similar name shader already present!'
+            )
+
+    def add_scene_light(self, light):
+        if light.name not in self._lights:
+            self._shaders.update({light.name: light})
+        else:
+            LOGGER.error(
+                f'Failed to add light "{light.name}" to scene'
+                f' since similar name light already present!'
+            )
+
     def add_entity(self, entity: str or list, update_uid=False):
         if not isinstance(entity, list):
             entities = [entity]
@@ -81,7 +114,7 @@ class Scene:
             entities = entity
 
         for ent in entities:
-            if isinstance(ent, Entity):
+            if isinstance(ent, Entity) or isinstance(ent, AmbientLight):
                 if not update_uid:
                     if ent.uid in self._entities:
                         LOGGER.error(
@@ -96,7 +129,7 @@ class Scene:
             else:
                 LOGGER.error(
                     f'Failed to add entity!, provided entity {ent} '
-                    f'do not have valid type')
+                    f'do not have valid type : {type(ent)}')
 
     def destroy_entity(self, entity):
         if entity.uid not in self._entities:

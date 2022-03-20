@@ -22,6 +22,7 @@ class TextureMap:
         self._wrapping_method = kwargs.get('wrapping_method') or GL_REPEAT
         self._texture_buffer = None
         self._texture_data = None
+        self._in_use = False
 
     def __str__(self):
         return f'Texture2D({self._texture_path}) at {hex(id(self))}'
@@ -71,6 +72,14 @@ class TextureMap:
         image = Image.open(self._texture_path)
         self._texture_data = np.array(list(image.getdata()), np.uint8)
         '''
+
+    @property
+    def in_use(self) -> bool:
+        return self._in_use
+
+    @in_use.setter
+    def in_use(self, val: bool):
+        self._in_use = val
 
     @property
     def texture_slot(self):
@@ -136,6 +145,9 @@ class TextureMap:
         self.init_texture()
 
     def use(self):
+        # if self.in_use:
+        #     return
+
         if self._texture_slot == 0:
             glActiveTexture(GL_TEXTURE0)
         elif self._texture_slot == 1:
@@ -148,7 +160,9 @@ class TextureMap:
             glActiveTexture(GL_TEXTURE4)
 
         glBindTexture(GL_TEXTURE_2D, self._texture_buffer)
+        self.in_use = True
 
     def destroy(self):
         glBindTexture(GL_TEXTURE_2D, 0)
-        # glDeleteTextures(1, [self._texture_buffer, ])
+        glDeleteTextures(1, (self._texture_buffer, ))
+        self.in_use = False
