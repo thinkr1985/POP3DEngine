@@ -45,6 +45,21 @@ class VertexAttributeError(Exception):
         logger.error(message)
 
 
+class ShaderCompilationError(Exception):
+    """Get raised when Shader compilation fails."""
+    def __init__(self, message=None):
+        super().__init__()
+        logger.error(message)
+
+
+class UnsupportedShaderType(Exception):
+    """Get raised when Shader is not defined in the constant.py's
+     SUPPORTED_SHADER_TYPES."""
+    def __init__(self, message=None):
+        super().__init__()
+        logger.error(message)
+
+
 class CameraCreationError(Exception):
     """Get raised when failed to create cameras."""
     def __init__(self, message=None):

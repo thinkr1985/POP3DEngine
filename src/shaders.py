@@ -1,24 +1,26 @@
-import numpy as np
-
-from exceptions import (VertexShaderCompilationError,
-                        FragmentShaderCompilationError, ShaderProgramLinkError)
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 
+from exceptions import (ShaderCompilationError, ShaderProgramLinkError,
+                        UnsupportedShaderType)
 from logger import get_logger
-from constants import DEFAULT_SHADER, CONSTANT_SHADER, DEFAULT_TEXTURES, STRIDE
+from constants import (SHADER_SRC, DEFAULT_TEXTURES, STRIDE,
+                       SUPPORTED_SHADER_TYPES)
 from texture import TextureMap
 
 LOGGER = get_logger(__file__)
 
+CACHED_SHADER_SOURCES = dict()
+CACHED_TEXTURE_MAPS = dict()
+
 
 class Shader:
-    def __init__(self, scene, shader_name: str, vert_src: str, frag_src: str, color_map_src: str = None,
-                 normal_map_src: str = None, apply_default_maps=True, **kwargs):
+    def __init__(self, scene, shader_name: str, shader_base_dir: str,
+                 color_map_src: str = None, normal_map_src: str = None,
+                 apply_default_maps=True, **kwargs):
         self.name = shader_name
         self.scene = scene
-        self.vert_src = vert_src
-        self.frag_src = frag_src
+        self._shader_base_dir = shader_base_dir
         self.color_map_src = color_map_src
         self.normal_map_src = normal_map_src
         self.apply_default_map = apply_default_maps
@@ -52,49 +54,99 @@ class Shader:
         return shader_attribute_dict
 
     def _init_shader(self):
-        checker_tex = os.path.join( DEFAULT_TEXTURES, 'checker_board.png')
-        normal_map = os.path.join(DEFAULT_TEXTURES, 'checker_board_normal.png')
-
-        if self.apply_default_map:
-            if not self.color_map_src:
-                self.color_texture_map = TextureMap(checker_tex, texture_slot=0)
-                self.color_texture_map.init_texture()
-            if not self.normal_map_src:
-                self.normal_texture_map = TextureMap(normal_map, texture_slot=1)
-                self.normal_texture_map.init_texture()
-
-        LOGGER.info(f'Compiling shader {self.name}')
-
-        vertex_shader = glCreateShader(GL_VERTEX_SHADER)
-        fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
-
-        glShaderSource(vertex_shader, self.default_vertex_shader_code())
-        glShaderSource(fragment_shader, self.default_fragment_shader_code())
-
-        glCompileShader(vertex_shader)
-        if not glGetShaderiv(vertex_shader, GL_COMPILE_STATUS):
-            error_ = glGetShaderInfoLog(vertex_shader).decode()
-            raise VertexShaderCompilationError(
-                f"Vertex shader compilation error: {error_}"
-            )
-
-        glCompileShader(fragment_shader)
-        if not glGetShaderiv(fragment_shader, GL_COMPILE_STATUS):
-            error_ = glGetShaderInfoLog(fragment_shader).decode()
-            raise FragmentShaderCompilationError(
-                f"Fragment shader compilation error: {error_}"
-            )
-
-        glAttachShader(self.shader_program, vertex_shader)
-        glAttachShader(self.shader_program, fragment_shader)
+        self._create_texture_maps()
+        shaders = self._compile_shader_sources()
         glLinkProgram(self.shader_program)
 
         if not glGetProgramiv(self.shader_program, GL_LINK_STATUS):
             error_ = (glGetProgramInfoLog(self.shader_program))
             raise ShaderProgramLinkError(f'Linking error : {error_}')
 
-        glDetachShader(self.shader_program, vertex_shader)
-        glDetachShader(self.shader_program, fragment_shader)
+        for shader in shaders:
+            glDetachShader(self.shader_program, shader)
+
+    def _create_texture_maps(self):
+        checker_tex = os.path.join(DEFAULT_TEXTURES, 'checker_board.png')
+        normal_map = os.path.join(DEFAULT_TEXTURES, 'checker_board_normal.png')
+
+        if self.apply_default_map:
+            if not self.color_map_src:
+                if checker_tex in CACHED_TEXTURE_MAPS:
+                    self.color_texture_map = CACHED_TEXTURE_MAPS.get(
+                        checker_tex)
+                else:
+                    self.color_texture_map = TextureMap(checker_tex,
+                                                        texture_slot=0)
+                    self.color_texture_map.init_texture()
+                    CACHED_TEXTURE_MAPS.update(
+                        {checker_tex: self.color_texture_map})
+
+        if self.apply_default_map:
+            if not self.normal_map_src:
+                if normal_map in CACHED_TEXTURE_MAPS:
+                    self.normal_texture_map = CACHED_TEXTURE_MAPS.get(
+                        normal_map)
+                else:
+                    self.normal_texture_map = TextureMap(normal_map,
+                                                         texture_slot=1)
+                    self.normal_texture_map.init_texture()
+                    CACHED_TEXTURE_MAPS.update(
+                        {normal_map: self.normal_texture_map})
+
+    def _compile_shader_sources(self) -> list:
+        LOGGER.info(f'Compiling shader {self.name}')
+
+        shader_dir = os.path.join(SHADER_SRC, self._shader_base_dir)
+        if not os.path.exists(shader_dir):
+            raise ShaderCompilationError(
+                f'Failed to locate shader folder "{shader_dir}" to compile '
+                f'shader "{self.name}"')
+
+        found = False
+        shaders = list()
+
+        for file_ in os.listdir(shader_dir):
+            if file_.endswith('.glsl'):
+                shader_type = SUPPORTED_SHADER_TYPES.get(file_.split('_')[0])
+                if not shader_type:
+                    raise UnsupportedShaderType(
+                        f'Failed to find shader type for {file_.split("_")[0]}'
+                        f' in "SUPPORTED_SHADER_TYPES" variable of '
+                        f'constants.py')
+
+                shader = self._compile_shader(
+                    shader_src_file=os.path.join(shader_dir, file_),
+                    shader_type=shader_type)
+
+                found = True
+                shaders.append(shader)
+
+        if not found:
+            raise ShaderCompilationError(
+                f'No ".glsl" file found im the shader dir {shader_dir} '
+                f'to compile shader "{self.name}"')
+        return shaders
+
+    def _compile_shader(self, shader_src_file: str, shader_type: GL_SHADER_TYPE) -> GL_SHADER:
+        if shader_src_file not in CACHED_SHADER_SOURCES:
+            with open(shader_src_file, 'r') as rp:
+                LOGGER.info(f'reading shader source {shader_src_file}')
+                shader_lines = rp.readlines()
+                CACHED_SHADER_SOURCES.update({shader_src_file: shader_lines})
+        else:
+            shader_lines = CACHED_SHADER_SOURCES.get(shader_src_file)
+
+        shader = glCreateShader(shader_type)
+        glShaderSource(shader, shader_lines)
+        glCompileShader(shader)
+
+        if not glGetShaderiv(shader, GL_COMPILE_STATUS):
+            error_ = glGetShaderInfoLog(shader).decode()
+            raise ShaderCompilationError(
+                f"shader {shader_src_file} compilation error: {error_}"
+            )
+        glAttachShader(self.shader_program, shader)
+        return shader
 
     @property
     def in_use(self) -> bool:
@@ -111,16 +163,6 @@ class Shader:
     @stride.setter
     def stride(self, stride_val: int):
         self._stride = stride_val
-
-    def default_vertex_shader_code(self):
-        LOGGER.info(f'Reading {self.vert_src}')
-        with open(self.vert_src, 'r') as vp:
-            return vp.readlines()
-
-    def default_fragment_shader_code(self):
-        LOGGER.info(f'Reading {self.frag_src}')
-        with open(self.frag_src, 'r') as fp:
-            return fp.readlines()
 
     def get_all_active_shader_uniforms(self) -> dict:
         attr_count = glGetProgramiv(self.shader_program, GL_ACTIVE_UNIFORMS)
@@ -222,10 +264,7 @@ class DefaultShader(Shader):
     def __init__(self,
                  scene,
                  shader_name: str = 'default_shader',
-                 vert_src: str = os.path.join(
-                     DEFAULT_SHADER, 'vertex_shader.glsl'),
-                 frag_src: str = os.path.join(
-                     DEFAULT_SHADER, 'fragment_shader.glsl'),
+                 shader_base_dir: str = os.path.join(SHADER_SRC, 'lambert'),
                  color_map_src: str = None,
                  normal_map_src: str = None,
                  **kwargs):
@@ -233,8 +272,7 @@ class DefaultShader(Shader):
         super().__init__(
                         scene=scene,
                         shader_name=shader_name,
-                        vert_src=vert_src,
-                        frag_src=frag_src,
+                        shader_base_dir=shader_base_dir,
                         color_map_src=color_map_src,
                         normal_map_src=normal_map_src,
                         kwargs=kwargs
@@ -245,18 +283,14 @@ class ConstantShader(Shader):
     def __init__(self,
                  scene,
                  shader_name: str = 'constant_shader',
-                 vert_src: str = os.path.join(
-                     CONSTANT_SHADER, 'vertex_shader.glsl'),
-                 frag_src: str = os.path.join(
-                     CONSTANT_SHADER, 'fragment_shader.glsl'),
+                 shader_base_dir: str = os.path.join(SHADER_SRC, 'constant'),
                  color: list = None,
                  **kwargs):
 
         super().__init__(
                         scene=scene,
                         shader_name=shader_name,
-                        vert_src=vert_src,
-                        frag_src=frag_src,
+                        shader_base_dir=shader_base_dir,
                         apply_default_maps=False,
                         kwargs=kwargs
                         )

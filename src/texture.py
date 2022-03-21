@@ -7,6 +7,7 @@ from OpenGL.GLUT import *
 from logger import get_logger
 
 LOGGER = get_logger(__file__)
+CACHED_TEXTURE_SOURCES = dict()
 
 
 class TextureMap:
@@ -30,10 +31,9 @@ class TextureMap:
     def __repr__(self):
         return f'Texture2D({self._texture_path}) at {hex(id(self))}'
 
-    def init_texture(self):
-        LOGGER.info(f'Creating Texture Buffer for {self._texture_path}')
-
-        self.read_texture()
+    def init_texture(self, reload: bool = False):
+        LOGGER.info(f'Creating Texture buffer for {self._texture_path}')
+        self.read_texture(reload=reload)
         self._texture_buffer = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self._texture_buffer)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self.wrapping_method)
@@ -51,22 +51,43 @@ class TextureMap:
                      self._texture_data)
         glGenerateMipmap(GL_TEXTURE_2D)
 
-    def read_texture(self):
-        with imageio.get_reader(self._texture_path) as reader:
-            # for texture sequences you need to loop through reader length
-            self._width, self._height, self._num_channels = reader.get_data(0).shape
-            self._image_format = reader.format
+    def read_texture(self, reload: bool = False):
+        if self._texture_path in CACHED_TEXTURE_SOURCES and not reload:
+            texture_data = CACHED_TEXTURE_SOURCES.get(self._texture_path)
+            self._width = texture_data.get('width')
+            self._height = texture_data.get('height')
+            self._num_channels = texture_data.get('num_channels')
+            self._image_format = texture_data.get('format')
+            self._texture_type = texture_data.get('texture_type')
+            self._texture_data = texture_data.get('texture_array')
+        else:
+            LOGGER.info(f'Reading Texture file {self._texture_path}')
+            with imageio.get_reader(self._texture_path) as reader:
+                # for texture sequences you need to loop through reader length
+                self._width, self._height, self._num_channels = reader.get_data(0).shape
+                self._image_format = reader.format
 
-            if self._num_channels == 3:
-                self._texture_type = GL_RGB
-            elif self._num_channels > 3:
-                self._texture_type = GL_RGBA
+                if self._num_channels == 3:
+                    self._texture_type = GL_RGB
+                elif self._num_channels > 3:
+                    self._texture_type = GL_RGBA
 
-            # flipped_image = reader.get_data(0)
-            self._texture_data = np.flipud(reader.get_data(0))
-            self._texture_data = np.rot90(self._texture_data)
-            self._texture_data = np.array(self._texture_data, np.uint8)
+                # flipped_image = reader.get_data(0)
+                self._texture_data = np.flipud(reader.get_data(0))
+                self._texture_data = np.rot90(self._texture_data)
+                self._texture_data = np.array(self._texture_data, np.uint8)
 
+                CACHED_TEXTURE_SOURCES.update(
+                    {
+                        self._texture_path:
+                            {
+                                'width': self._width,
+                                'height': self._height,
+                                'num_channels': self._num_channels,
+                                'format': self._image_format,
+                                'texture_type': self._texture_type,
+                                'texture_array': self._texture_data}
+                    })
         # following is optional method with PIL
         '''
         image = Image.open(self._texture_path)
@@ -142,7 +163,7 @@ class TextureMap:
 
     def reload(self):
         glDeleteTextures(1, (self._texture_buffer,))
-        self.init_texture()
+        self.init_texture(reload=True)
 
     def use(self):
         # if self.in_use:

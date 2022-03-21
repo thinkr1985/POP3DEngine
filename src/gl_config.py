@@ -19,7 +19,7 @@ class GLSettings:
             'smooth_lines': True,
             'line_width': 1,
             'smooth_polygons': False,
-            'wireframe_mode': True,
+            'wireframe_mode': False,
             'point_mode': False,
             'point_size': 3,
             'flat_shading': True,

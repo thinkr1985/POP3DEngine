@@ -41,7 +41,7 @@ def import_pymesh(filepath: str, object_name: str = None, scene=None):
                 user_attributes=entity_data.get('user_attributes'),
                 source_file=entity_data.get('source_file'),
                 scene=scene,
-                shader=ConstantShader(shader_name=f'DefaultShader_{num}', scene=scene)
+                shader=DefaultShader(shader_name=f'DefaultShader_{num}', scene=scene)
             )
         entities.append(entity)
        

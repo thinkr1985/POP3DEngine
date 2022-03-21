@@ -167,7 +167,7 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         self.initial_time = time.time()
         self.prev_time = glutGet(GLUT_ELAPSED_TIME)
 
-        teapot = pymesh_reader.import_pymesh(r"E:\GitHub\POP3DEngine\src\pymesh_examples\war_jeep.pymesh", scene=self._scene)
+        teapot = pymesh_reader.import_pymesh(r"E:\GitHub\POP3DEngine\src\pymesh_examples\deer.pymesh", scene=self._scene)
         self._scene.add_entity(teapot)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:

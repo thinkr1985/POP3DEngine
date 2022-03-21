@@ -1,13 +1,18 @@
 import os
 import psutil
+from OpenGL.GL import *
 
 MODULE = os.path.dirname(__file__)
 
 ICONS_PATH = os.path.join(MODULE, 'icons')
 
-DEFAULT_SHADER = os.path.join(MODULE, 'default_shaders', 'lambert')
+SHADER_SRC = os.path.join(MODULE, 'default_shaders')
 
-CONSTANT_SHADER = os.path.join(MODULE, 'default_shaders', 'constant')
+SUPPORTED_SHADER_TYPES = {
+    'fragment': GL_FRAGMENT_SHADER,
+    'vertex': GL_VERTEX_SHADER,
+    'geometry': GL_GEOMETRY_SHADER,
+    'compute': GL_COMPUTE_SHADER}
 
 DEFAULT_TEXTURES = os.path.join(MODULE, 'default_textures')
 
