@@ -1,10 +1,10 @@
 import numpy as np
 import uuid
 from OpenGL.GL import *
-
-from constants import STRIDE
+from pprint import pprint
 from logger import get_logger
-from transformation import Transformations
+from exceptions import EntityCreationError
+import transformation
 
 LOGGER = get_logger(__file__)
 
@@ -13,6 +13,7 @@ class Entity:
     def __init__(self, entity_name: str, buffers: dict, scene,
                  transformations: list = None, user_attributes: dict = None,
                  shader=None, draw_method=GL_TRIANGLES, **kwargs):
+        self._type = 'baseEntity'
         self._name = entity_name
         self._vertex_buffer_list = buffers.get('vertex_buffer')
         self._index_buffer_list = buffers.get('index_buffer')
@@ -28,7 +29,7 @@ class Entity:
         self._draw_method = draw_method
         self._uid = uuid.uuid1()
         self._shader = shader or self.scene.default_shader
-        self._transformations = Transformations(
+        self._transformations = transformation.Transformations(
             entity=self, transformations=transformations)
 
         self.triangles_indices = list()
@@ -36,11 +37,33 @@ class Entity:
 
         self._init_entity()
 
+    def __new__(cls, *args, **kwargs):
+        ent_name = kwargs.get('entity_name')
+        # if not ent_name:
+        #     raise EntityCreationError(
+        #         'Failed to create entity, name not provided!')
+
+        scene = kwargs.get('scene')
+        if not scene:
+            raise EntityCreationError(
+                f'Failed to create entity {ent_name}, scene not provided!')
+
+        if ent_name in [x.name for x in scene.entities.values()]:
+            raise EntityCreationError(
+                f'Failed to create entity, Entity with name {ent_name}'
+                f' already exists!')
+
+        # if not kwargs.get('buffers'):
+        #     raise EntityCreationError(
+        #         f'Failed to create entity {ent_name}, buffers not provided!')
+
+        return super(Entity, cls).__new__(cls)
+
     def __str__(self):
-        return f'Entity({self._name}) at {hex(id(self))}'
+        return f'{self._type}({self._name}) at {hex(id(self))}'
 
     def __repr__(self):
-        return f'Entity({self._name}) at {hex(id(self))}'
+        return f'{self._type}({self._name}) at {hex(id(self))}'
 
     def _init_entity(self):
         glBindVertexArray(self.vertex_array_buffer)
@@ -66,6 +89,22 @@ class Entity:
         # unbind the buffers
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
+
+    @property
+    def translate(self) -> transformation.Translation:
+        return self._transformations.translate
+
+    @property
+    def rotate(self) -> transformation.Rotation:
+        return self._transformations.rotate
+
+    @property
+    def size(self) -> transformation.Scale:
+        return self._transformations.size
+
+    @property
+    def type(self) -> str:
+        return self._type
 
     def regenerate_uid(self):
         self._uid = uuid.uuid1()
@@ -99,7 +138,7 @@ class Entity:
         return self._indices
 
     @property
-    def transformations(self) -> Transformations:
+    def transformations(self) -> transformation.Transformations:
         return self._transformations
 
     @property
@@ -143,3 +182,21 @@ class Entity:
     def destroy(self):
         glDeleteBuffers(1, (self.vertex_buffer,))
         glDeleteBuffers(1, (self.index_buffer,))
+
+
+class MeshEntity(Entity):
+    def __init__(self, entity_name: str, buffers: dict, scene,
+                 transformations: list = None, user_attributes: dict = None,
+                 shader=None, draw_method=GL_TRIANGLES, **kwargs):
+
+        super().__init__(
+            entity_name=entity_name,
+            buffers=buffers,
+            scene=scene,
+            transformations=transformations,
+            user_attributes=user_attributes,
+            shader=shader,
+            draw_method=draw_method,
+            kwargs=kwargs)
+
+        self._type = 'meshEntity'

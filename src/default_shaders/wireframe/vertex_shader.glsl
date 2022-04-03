@@ -1,7 +1,7 @@
 #version 410 core
-in vec4 gxl3d_Position;
+layout (location = 0) in vec4 vertexPosition;
 
 void main()
 {
-  gl_Position = gxl3d_Position;
+  gl_Position = vertexPosition;
 }

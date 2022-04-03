@@ -26,7 +26,6 @@ class Renderer:
     def render(self):
         self.scene.active_camera.use()
         self._draw_entities()
-        self.scene.ambient_light.draw()
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_TEXTURE_BUFFER, 0)

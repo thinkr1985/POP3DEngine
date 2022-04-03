@@ -1,4 +1,6 @@
 import numpy as np
+import pyrr
+
 from logger import get_logger
 
 LOGGER = get_logger(__file__)
@@ -8,9 +10,10 @@ class Transformations:
     def __init__(self, entity, transformations: list = None, **kwargs):
         self._entity = entity
         self._transformations = transformations or [0, 0, 0, 0, 0, 0, 1, 1, 1]
-        self._position = np.array(self._transformations[:3], dtype=np.float32)
-        self._eulers = np.array(self._transformations[3:6], dtype=np.float32)
-
+        self._identity_matrix = pyrr.matrix44.create_identity(dtype=np.float32)
+        self._translation = Translation(self, self._transformations[:3])
+        self._rotation = Rotation(self, self._transformations[3:6])
+        self._scale = Scale(self, self._transformations[6:])
         self._init_transformations()
 
     def __new__(cls, *args, **kwargs):
@@ -36,10 +39,10 @@ class Transformations:
         return super(Transformations, cls).__new__(cls)
 
     def __str__(self):
-        return f'Transformations({self._entity.name}, {self._transformations}) at {hex(id(self))}'
+        return f'Transformations({self._entity.name}, {self._transformations})'
 
     def __repr__(self):
-        return f'Transformations({self._entity.name}, {self.transformations}) at {hex(id(self))}'
+        return f'Transformations({self._entity.name}, {self.transformations})'
 
     def _init_transformations(self):
         pass
@@ -48,137 +51,218 @@ class Transformations:
     def transformations(self) -> list:
         return self._transformations
 
-    @transformations.setter
-    def transformations(self, val: list):
-        if isinstance(val, tuple):
-            val = list(val)
+    def update_transformations(self):
+        self._transformations = [self.translation[0],
+                                 self.translation[1],
+                                 self.translation[2],
+                                 self.rotation[0],
+                                 self.rotation[1],
+                                 self.rotation[2],
+                                 self.scale[0],
+                                 self.scale[1],
+                                 self.scale[2]]
 
-        if not len(val) == 9:
-            LOGGER.error(
-                f'Failed to set transformations on entity {self._entity.name}')
-            return
-        if 0 in val[6:]:
-            LOGGER.error(f'Failed to set transformations on entity {self._entity.name},'
-                         f'scale component cannot be equal to zero!')
-            return
+    @property
+    def identity_matrix(self) -> pyrr.matrix44:
+        return self._identity_matrix
 
-        self._transformations = val
+    @property
+    def translate(self):
+        return self._translation
+
+    @property
+    def rotate(self):
+        return self._rotation
+
+    @property
+    def size(self):
+        return self._scale
+
+    @property
+    def position(self) -> np.array:
+        return self._translation.np_array
 
     @property
     def translation(self) -> list:
-        return self._transformations[:3]
+        return self._translation.translation
 
     @translation.setter
     def translation(self, val: list):
-        if isinstance(val, tuple):
-            val = list(val)
-
-        if not len(val) == 3:
-            LOGGER.error(f'Failed to set translation on entity {self._entity.name},'
-                         f'input translation list element count should be 3')
-            return
-        self._transformations = [val, self.rotation, self.scale]
+        self._translation.translation = val
 
     @property
     def rotation(self) -> list:
-        return self._transformations[3:6]
+        return self._rotation.rotation
 
     @rotation.setter
     def rotation(self, val: list):
-        if isinstance(val, tuple):
-            val = list(val)
-
-        if not len(val) == 3:
-            LOGGER.error(f'Failed to set rotation on entity {self._entity.name},'
-                         f'input rotation list element count should be 3')
-            return
-        self._transformations = [self.translation, val, self.scale]
+        self._rotation.rotation = val
 
     @property
     def scale(self) -> list:
-        return self._transformations[6:]
+        return self._scale.scale
 
     @scale.setter
     def scale(self, val: list):
+        self._scale.scale = val
+
+    def reset_transformations(self):
+        self._translation.translation = [0, 0, 0]
+        self._rotation.rotation = [0, 0, 0]
+        self._scale.scale = [1, 1, 1]
+
+
+class TransformBase:
+    def __init__(self, transformation: Transformations,
+                 base_value: list, type_: str = 'TransformBase', **kwargs):
+        self._transformations = transformation
+        self._transform_base = base_value
+        self._type = type_
+
+    def __str__(self):
+        return f'{self._type}({self._transform_base}) @ {self.transformations.entity.name}'
+
+    def __repr__(self):
+        return f'{self._type}({self._transform_base}) @ {self.transformations.entity.name}'
+
+    @property
+    def np_array(self) -> np.array:
+        return np.array(self._transform_base, dtype=np.float32)
+
+    @property
+    def transformations(self) -> Transformations:
+        return self.transformations
+
+    @property
+    def transform_base(self) -> list:
+        return self._transform_base
+
+    @transform_base.setter
+    def transform_base(self, val: list):
         if isinstance(val, tuple):
             val = list(val)
 
         if not len(val) == 3:
-            LOGGER.error(f'Failed to set scale on entity {self._entity.name},'
-                         f'input scale list element count should be 3')
+            LOGGER.error(
+                f'Failed to set {self._type} on entity'
+                f' {self._transformations.entity.name},'
+                f'input {self._type} list element count should be 3')
             return
-        self._transformations = [self.translation, self.rotation, val]
+        self._transform_base = val
+        self._transformations.update_transformations()
 
     @property
-    def translateX(self) -> float:
-        return self.translation[0]
+    def x(self) -> float:
+        return self._transform_base[0]
 
-    @translateX.setter
-    def translateX(self, val: float):
-        if not val:
-            val = 0
-        self.translation = [val, self.translation[1], self.translation[2]]
-
-    @property
-    def translateY(self) -> float:
-        return self.translation[1]
-
-    @translateY.setter
-    def translateY(self, val: float):
-        self.translation = [self.translation[0], val, self.translation[2]]
+    @x.setter
+    def x(self, val: float):
+        if isinstance(val, float) or isinstance(val, int):
+            self.transform_base = [val,
+                                   self._transform_base[1],
+                                   self._transform_base[2]]
+            self._transformations.update_transformations()
 
     @property
-    def translateZ(self) -> float:
-        return self.translation[2]
+    def y(self) -> float:
+        return self._transform_base[1]
 
-    @translateZ.setter
-    def translateZ(self, val: float):
-        self.translation = [self.translation[0], self.translation[1], val]
-
-    @property
-    def rotateX(self) -> float:
-        return self.rotation[0]
-
-    @rotateX.setter
-    def rotateX(self, val: float):
-        self.rotation = [val, self.rotation[0], self.rotation[1]]
+    @y.setter
+    def y(self, val: float):
+        if isinstance(val, float) or isinstance(val, int):
+            self.transform_base = [self._transform_base[0],
+                                   val,
+                                   self._transform_base[2]]
+            self._transformations.update_transformations()
 
     @property
-    def rotateY(self) -> float:
-        return self.rotation[1]
+    def z(self) -> float:
+        return self._transform_base[2]
 
-    @rotateY.setter
-    def rotateY(self, val: float):
-        self.rotation = [self.rotation[0], val, self.rotation[1]]
+    @z.setter
+    def z(self, val: float):
+        if isinstance(val, float) or isinstance(val, int):
+            self.transform_base = [self._transform_base[0],
+                                   self._transform_base[1],
+                                   val]
+            self._transformations.update_transformations()
 
-    @property
-    def rotateZ(self) -> float:
-        return self.rotation[2]
 
-    @rotateZ.setter
-    def rotateZ(self, val: float):
-        self.rotation = [self.rotation[0], self.rotation[1], val]
-
-    @property
-    def scaleX(self) -> float:
-        return self.scale[0]
-
-    @scaleX.setter
-    def scaleX(self, val: float):
-        self.scale = [val, self.scale[0], self.scale[1]]
+class Translation(TransformBase):
+    def __init__(self, transformation: Transformations, base_value: list,
+                 type_='Translation', **kwargs):
+        super().__init__(
+            transformation=transformation, base_value=base_value, type_=type_,
+            kwargs=kwargs
+        )
 
     @property
-    def scaleY(self) -> float:
-        return self.scale[1]
+    def translation(self) -> list:
+        return self.transform_base
 
-    @scaleY.setter
-    def scaleY(self, val):
-        self.scale = [self.scale[0], val, self.scale[1]]
+    @translation.setter
+    def translation(self, val: list):
+        self.transform_base = val
+
+
+class Rotation(TransformBase):
+    '''
+        pitch: rotation around x axis
+        roll: rotation around y axis
+        yaw: rotation around z axis
+    '''
+    def __init__(self, transformation: Transformations, base_value: list,
+                 type_='Rotation', **kwargs):
+        super().__init__(
+            transformation=transformation, base_value=base_value,
+            type_=type_, kwargs=kwargs
+        )
 
     @property
-    def scaleZ(self) -> float:
-        return self.scale[2]
+    def rotation(self) -> list:
+        return self.transform_base
 
-    @scaleZ.setter
-    def scaleZ(self, val: float):
-        self.scale = [self.scale[0], self.scale[1], val]
+    @rotation.setter
+    def rotation(self, val: list):
+        self.transform_base = val
+
+    @property
+    def pitch(self) -> float:
+        return self.x
+
+    @pitch.setter
+    def pitch(self, value: float):
+        self.x = value
+
+    @property
+    def roll(self) -> float:
+        return self.y
+
+    @roll.setter
+    def roll(self, value: float):
+        self.y = value
+
+    @property
+    def yaw(self) -> float:
+        return self.z
+
+    @yaw.setter
+    def yaw(self, value: float):
+        self.z = value
+
+
+class Scale(TransformBase):
+    def __init__(self, transformation: Transformations, base_value: list,
+                 type_='Scale'):
+        super().__init__(
+            transformation=transformation, base_value=base_value,
+            type_=type_
+        )
+
+    @property
+    def scale(self) -> list:
+        return self.transform_base
+
+    @scale.setter
+    def scale(self, val: list):
+        self.transform_base = val

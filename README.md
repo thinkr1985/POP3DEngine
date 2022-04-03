@@ -12,6 +12,7 @@ Building a 3D application / 3D engine completely from scratch using Python, Open
 <p>PyOpenGl-accelerate==3.1.5
 <p>imageio==2.13.3
 <p>pyrr==0.10.3
+<p>psutils==5.9.0
 
 <p>
 <h3> Branches - </h3>

@@ -12,7 +12,7 @@ class Grid(Entity):
     def __init__(self, scene=None, grid_length: int = 25, **kwargs):
         self._buffers = {'vertex_buffer': list(), 'index_buffer': list()}
         self._shader = ConstantShader(
-            shader_name='GridShader', scene=scene, color=[0.7, 0.7, 0.7, 1.0]
+            shader_name='GridShader', scene=scene, color=[0.5, 0.5, 0.5, 1.0]
         )
         self._shader.stride = 12
         self._grid_length = grid_length
@@ -27,6 +27,7 @@ class Grid(Entity):
                          draw_method=GL_LINES,
                          kwargs=kwargs)
         self._scene.add_entity(entity=self)
+        self._type = 'gridEntity'
 
     def _build_buffers(self):
         LOGGER.info(f'Setting up {self._grid_length} unit grid')

@@ -1,91 +1,74 @@
-import os
 import pyrr
 import numpy as np
-from OpenGL import *
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 
-from exceptions import CameraCreationError
+from entity import Entity
+from utilities import utils
+from constants import (NUM_LIGHT_LIMITS, ATMOSPHERE_DIFFUSE_COLOR,
+                       ATMOSPHERE_DIFFUSE_INTENSITY, DEFAULT_SHAPES_DIR)
 from logger import get_logger
 
 LOGGER = get_logger(__file__)
 
 
-class Camera:
+class Camera(Entity):
     def __init__(self,
                  focal_length: float,
-                 width: int,
-                 height: int,
+                 width: float,
+                 height: float,
                  far_clip: float,
                  near_clip: float,
-                 camera_type: str,
                  camera_name: str,
+                 shape_buffers: dict,
                  scene,
+                 draw_method=GL_LINES,
+                 transformations=None,
                  **kwargs):
+        super().__init__(
+            entity_name=camera_name,
+            buffers=shape_buffers,
+            scene=scene,
+            draw_method=draw_method,
+            shader=scene.constant_shader,
+            transformations=transformations,
+            kwargs=kwargs)
 
+        self._type = 'cameraEntity'
         self._focal_length = focal_length
         self._width = width
         self._height = height
         self._far_clip = far_clip
         self._near_clip = near_clip
-        self._camera_type = camera_type
-        self._camera_name = camera_name
-        self._scene = scene
 
-        self._identity_matrix = pyrr.matrix44.create_identity(dtype=np.float32)
-        self._translation = [0, 0, -2]
-        self._rotation = [-30, 0, 0]
-        self._model_uniform_location = None
-        self._project_uniform_location = None
-        self._view_uniform_location = None
+        self.theta = 0
+        self.phi = 0
+        self.update_vectors()
 
-        self._init_camera()
+    def update_vectors(self):
+        self.forwards = np.array(
+            [
+                np.cos(np.deg2rad(self.theta)) * np.cos(np.deg2rad(self.phi)),
+                np.sin(np.deg2rad(self.theta)) * np.cos(np.deg2rad(self.phi)),
+                np.sin(np.deg2rad(self.phi))
+            ],
+            dtype=np.float32
+        )
 
-    def __new__(cls, *args, **kwargs):
-        scene = kwargs.get('scene')
-        if not scene:
-            raise CameraCreationError(
-                'Failed to create camera, scene not provided!')
-
-        if not kwargs.get('width'):
-            raise CameraCreationError(
-                'Failed to create camera, width not provided!')
-
-        if not kwargs.get('height'):
-            raise CameraCreationError(
-                'Failed to create camera, height not provided!')
-
-        camera_name = kwargs.get('camera_name')
-        if not camera_name:
-            raise CameraCreationError(
-                'Failed to create camera, camera_name not provided!')
-
-        if camera_name in scene.cameras:
-            raise CameraCreationError(
-                f'Failed to create camera, camera with name {camera_name} '
-                f'already exists in the scene!'
-            )
-        return super(Camera, cls).__new__(cls)
-
-    def __str__(self):
-        return f'{self._camera_type}({self._camera_name}) at {hex(id(self))}'
-
-    def __repr__(self):
-        return f'{self._camera_type}({self._camera_name}) at {hex(id(self))}'
-
-    def _init_camera(self):
-        self._scene.add_camera(self)
+        globalUp = np.array([0, 1, 0], dtype=np.float32)
+        self.right = np.cross(self.forwards, globalUp)
+        self.up = np.cross(self.right, self.forwards)
 
     @property
-    def focal_length(self):
+    def focal_length(self) -> float:
         return self._focal_length
 
     @property
-    def aspect_ratio(self):
+    def aspect_ratio(self) -> float:
         return self._width / self._height
 
     @property
-    def width(self):
+    def width(self) -> float:
         return self._width
 
     @width.setter
@@ -93,24 +76,12 @@ class Camera:
         self._width = int(width)
 
     @property
-    def height(self):
+    def height(self) -> float:
         return self._height
 
     @height.setter
     def height(self, height: int):
         self._height = int(height)
-
-    @property
-    def camera_type(self):
-        return self._camera_type
-
-    @property
-    def camera_name(self):
-        return self._camera_name
-
-    @camera_name.setter
-    def camera_name(self, new_name: str):
-        self._camera_name = new_name
 
     @property
     def far_clip(self) -> float:
@@ -128,150 +99,113 @@ class Camera:
     def near_clip(self, near_clip: float):
         self._near_clip = float(near_clip)
 
-    @property
-    def scene(self):
-        return self._scene
-
-    @property
-    def shader(self):
-        return self._scene.default_shader
-
-    @property
-    def translation(self):
-        return self._translation
-
-    @translation.setter
-    def translation(self, translation: list):
-        self._translation = translation
-
-    @property
-    def translateX(self):
-        return self._translation[0]
-
-    @translateX.setter
-    def translateX(self, value):
-        self._translation = [value, self.translateY, self.translateZ]
-
-    @property
-    def translateY(self):
-        return self._translation[1]
-
-    @translateY.setter
-    def translateY(self, value):
-        self._translation = [self.translateX, value, self.translateZ]
-
-    @property
-    def translateZ(self):
-        return self._translation[2]
-
-    @translateZ.setter
-    def translateZ(self, value):
-        self._translation = [self.translateX, self.translateY, value]
-
-    @property
-    def pitch(self):
-        return self._rotation[0]
-
-    @pitch.setter
-    def pitch(self, value):
-        self._rotation = [value, self.roll, self.yaw]
-
-    @property
-    def roll(self):
-        return self._rotation[1]
-
-    @roll.setter
-    def roll(self, value):
-        self._rotation = [self.pitch, value, self.yaw]
-
-    @property
-    def yaw(self):
-        return self._rotation[2]
-
-    @yaw.setter
-    def yaw(self, value):
-        self._rotation = [self.pitch, self.roll, value]
-
-    @property
-    def rotation(self):
-        return self._rotation
-
-    @rotation.setter
-    def rotation(self, rotation: list):
-        self._rotation = rotation
-
-    @property
-    def identity_matrix(self):
-        return self._identity_matrix
-
-    @property
-    def model_uniform_location(self) -> int:
-        return self._model_uniform_location
-
-    @property
-    def project_uniform_location(self) -> int:
-        return self._project_uniform_location
-
-    @property
-    def view_uniform_location(self) -> int:
-        return self._view_uniform_location
-
-    def reset_transformations(self):
-        self._translation = [0, 0, -2]
-        self._rotation = [-30, 0, 0]
-
     def use(self):
         """
             pitch: rotation around x axis
             roll:rotation around z axis
             yaw: rotation around y axis
         """
-
-        transform_matrix = pyrr.matrix44.create_perspective_projection_matrix(
+        projection_matrix = pyrr.matrix44.create_perspective_projection_matrix(
             fovy=self._focal_length,
             aspect=self.aspect_ratio,
             near=self._near_clip,
             far=self._far_clip,
             dtype=np.float32
         )
-
+        view_matrix = pyrr.matrix44.create_look_at(
+            eye=self.transformations.position,
+            target=self.transformations.position + self.forwards,
+            up=self.up,
+            dtype=np.float32
+        )
         rotation_matrix = pyrr.matrix44.multiply(
-            m1=self._identity_matrix,
+            m1=self.transformations.identity_matrix,
             m2=pyrr.matrix44.create_from_eulers(
-                eulers=np.radians(self._rotation), dtype=np.float32
+                eulers=np.radians(self.transformations.rotate.np_array),
+                dtype=np.float32
             )
         )
         model_matrix = pyrr.matrix44.multiply(
             m1=rotation_matrix,
             m2=pyrr.matrix44.create_from_translation(
-                vec=np.array(self._translation), dtype=np.float32
+                vec=self.transformations.translate.np_array,
+                dtype=np.float32
             )
         )
+
+        scene_lights = self.scene.get_all_lights()
+
         for shader in self.scene.shaders.values():
             shader.use()
-            self._project_uniform_location = glGetUniformLocation(shader.shader_program, "projection")
-            self._model_uniform_location = glGetUniformLocation(shader.shader_program, "model")
+            atmosphere_color_location = glGetUniformLocation(
+                shader.shader_program,
+                "atmosphereColor")
+            atmosphere_intensity_location = glGetUniformLocation(
+                shader.shader_program,
+                "atmosphereIntensity")
 
-            glUniformMatrix4fv(self.project_uniform_location, 1, GL_FALSE,
-                               transform_matrix)
+            glUniform3fv(atmosphere_color_location, 1, GL_FALSE,
+                               ATMOSPHERE_DIFFUSE_COLOR)
 
-            glUniformMatrix4fv(self._model_uniform_location, 1, GL_FALSE,
-                               model_matrix)
+            glUniform1fv(atmosphere_intensity_location, 1, GL_FALSE,
+                               ATMOSPHERE_DIFFUSE_INTENSITY)
 
-    def destroy(self):
-        self._scene.remove_camera(camera_name=self._camera_name)
+            project_shade_location = glGetUniformLocation(shader.shader_program, "projection")
+            model_shade_location = glGetUniformLocation(shader.shader_program, "model")
+            view_uniform_location = glGetUniformLocation(shader.shader_program, "view")
+            camera_position_uniform = glGetUniformLocation(shader.shader_program, "cameraPosition")
+
+            glUniformMatrix4fv(project_shade_location, 1, GL_FALSE,
+                               projection_matrix)
+
+            glUniformMatrix4fv(model_shade_location, 1, GL_FALSE, model_matrix)
+
+            glUniformMatrix4fv(view_uniform_location, 1, GL_FALSE, view_matrix)
+
+            glUniform3fv(camera_position_uniform, 1, GL_FALSE,
+                               self.transformations.position)
+
+            # sending lights information
+            light_location = {
+                "position": [
+                    glGetUniformLocation(shader.shader_program, f"Lights[{i}].position")
+                    for i in range(NUM_LIGHT_LIMITS)
+                ],
+                "color": [
+                    glGetUniformLocation(shader.shader_program, f"Lights[{i}].color")
+                    for i in range(NUM_LIGHT_LIMITS)
+                ],
+                "intensity": [
+                    glGetUniformLocation(shader.shader_program, f"Lights[{i}].intensity")
+                    for i in range(NUM_LIGHT_LIMITS)
+                ]
+            }
+
+            for i, light in enumerate(scene_lights):
+                glUniform3fv(light_location["position"][i], 1,
+                             light.transformations.position)
+                glUniform3fv(light_location["color"][i], 1, light.color)
+                glUniform1f(light_location["intensity"][i], light.intensity)
 
 
 class PerspectiveCamera(Camera):
-    def __init__(self, width, height, camera_name, scene, focal_length=35.0,
-                 near_clip=0.1, far_clip=10.0, **kwargs):
+    def __init__(self, width: float, height, camera_name: str, scene,
+                 focal_length: float = 35.0, near_clip: float = 0.1,
+                 far_clip: float = 10.0, transformations: list = None,
+                 **kwargs):
+
+        camera_mesh_data = utils.read_pymesh_file(
+            os.path.join(DEFAULT_SHAPES_DIR, 'camera.pymesh'))
+
+        _transformations = transformations or [0, 10, -10, 0, 0, 0, 1, 1, 1]
+
         super().__init__(focal_length=focal_length,
                          width=width,
                          height=height,
                          far_clip=far_clip,
                          near_clip=near_clip,
                          camera_name=camera_name,
-                         camera_type='PerspectiveCamera',
                          scene=scene,
+                         draw_method=GL_LINES,
+                         shape_buffers=camera_mesh_data[0]['buffers'],
                          kwargs=kwargs)
-        LOGGER.info(f'Creating Perspective camera with name {camera_name}')

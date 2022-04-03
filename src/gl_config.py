@@ -33,7 +33,8 @@ class GLSettings:
                             GLUT_MULTISAMPLE |
                             GLUT_ALPHA |
                             GLUT_DEPTH |
-                            GLUT_CORE_PROFILE,
+                            GLUT_CORE_PROFILE |
+                            GL_CONTEXT_PROFILE_MASK
                             )
         glutInitContextProfile(GLUT_CORE_PROFILE)
 

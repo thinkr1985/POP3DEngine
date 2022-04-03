@@ -209,13 +209,13 @@ class Shader:
             if _location < 0:
                 LOGGER.warning(
                     f'Attribute "{attribute_name}" skipped to set '
-                    f'on the shader "{self.name}"')
+                    f'on the shader "{self.name}" for entity {entity.name}')
                 continue
             attrib_location = attrib_data.get('location')
             attrib_pointer_offset = attrib_data.get('pointer_offset')
             LOGGER.info(
                 f'Setting attribute "{attribute_name}" on the '
-                f'shader "{self.name}"')
+                f'shader "{self.name}" for entity {entity.name}')
 
             glBindBuffer(GL_ARRAY_BUFFER, entity.vertex_buffer)
             glEnableVertexAttribArray(attrib_location)
