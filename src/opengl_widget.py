@@ -8,7 +8,6 @@ from OpenGL.GLUT import *
 from OpenGL.GLUT.freeglut import *
 from OpenGL.GLU import *
 from glfw import *
-import psutil
 
 
 from constants import ICONS_PATH, PS_PROCESS
@@ -148,7 +147,8 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         LOGGER.info('Initializing OpenGLWidget')
         self.gl_settings.set_glrendersettings()
         self.gl_settings.print_gl_info()
-        self._scene = Scene(width=self.width(), height=self.height())
+        self._scene = Scene(width=self.width(), height=self.height(),
+                            scene_name='default_scene')
 
         glClearDepth(1.0)
         self.heads_up_display._init_headsup_display()

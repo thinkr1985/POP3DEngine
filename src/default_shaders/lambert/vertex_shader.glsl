@@ -15,12 +15,15 @@ out float fragAtmosphereIntensity;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 modelViewProjectMatrix;
 uniform vec3 atmosphereColor;
 uniform float atmosphereIntensity;
 
 void main()
 {
+    //gl_Position = projection * view * model * vec4(vertexPosition, 1.0);
     gl_Position = projection * model * vec4(vertexPosition, 1.0);
+
     fragmentTexCoord = vertexUV;
     fragmentPosition = (model * vec4(vertexPosition, 1.0)).xyz;
     fragmentNormal = mat3(model) * vertexNormal;

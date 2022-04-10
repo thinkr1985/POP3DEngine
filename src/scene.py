@@ -7,14 +7,16 @@ from shaders import DefaultShader, ConstantShader
 from cameras import PerspectiveCamera
 from grid import Grid
 from lights import AmbientLight
+from exceptions import SceneCreationError
 
 LOGGER = get_logger(__file__)
 
 
 class Scene:
-    def __init__(self, **kwargs):
-        self._width = 512
-        self._height = 512
+    def __init__(self, width: int, height: int, scene_name: str = 'default_scene', **kwargs):
+        self._scene_name = scene_name
+        self._width = width or 512
+        self._height = height or 512
 
         self._entities = dict()
         self._shaders = dict()
@@ -22,12 +24,28 @@ class Scene:
         self._default_shader: DefaultShader = DefaultShader(scene=self)
         self.constant_shader = ConstantShader(scene=self)
         self._renderer = Renderer(self)
-        self._active_camera: PerspectiveCamera = None
+        self._active_camera = None
 
-        self.ambient_light = AmbientLight(scene=self, light_name='default_ambient_light', color=[0.1, 0.0, 0.5])
+        self.ambient_light = AmbientLight(scene=self,
+                                          light_name='default_ambient_light',
+                                          color=[0.1, 0.0, 0.5])
         self.add_entity(self.ambient_light, update_uid=False)
         self._grid = Grid(scene=self)
         self._init_scene()
+
+    def __new__(cls, *args, **kwargs):
+        scene_name = kwargs.get('scene_name')
+        width = kwargs.get('width')
+        height = kwargs.get('height')
+
+        if not scene_name:
+            raise SceneCreationError('Cant create scene without "scene_name"')
+        if not width:
+            raise SceneCreationError('Cant create scene without width')
+        if not height:
+            raise SceneCreationError('Cant create a scene without height')
+
+        return super(Scene, cls).__new__(cls)
 
     def __str__(self):
         return f'Scene() @ {hex(id(self))}'
@@ -42,6 +60,10 @@ class Scene:
                                                 near_clip=0.1,
                                                 camera_name='persp')
         self._active_camera = camera
+
+    @property
+    def scene_name(self) -> str:
+        return self._scene_name
 
     @property
     def grid(self) -> Grid:
@@ -61,11 +83,11 @@ class Scene:
 
     @property
     def cameras(self) -> list:
-        camera_ents = list()
+        camera_entities = list()
         for ent_uid, ent in self._entities.items():
             if ent.type == 'cameraEntity':
-                camera_ents.append(ent)
-        return camera_ents
+                camera_entities.append(ent)
+        return camera_entities
 
     @property
     def active_camera(self) -> Entity:

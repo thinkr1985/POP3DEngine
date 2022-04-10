@@ -6,6 +6,7 @@ from logger import get_logger
 from entity import Entity
 from constants import DEFAULT_SHAPES_DIR
 from utilities import utils
+from shaders import ConstantShader
 LOGGER = get_logger(__file__)
 
 
@@ -23,14 +24,14 @@ class Light(Entity):
             buffers=shape_buffers,
             scene=scene,
             draw_method=draw_method,
-            shader=scene.constant_shader,
+            shader=ConstantShader(scene=scene, color=color,
+                                  shader_name=f'{light_name}_shader'),
             transformations=transformations,
             kwargs=kwargs)
 
         self._color = color or [1.0, 1.0, 1.0]
         self._intensity = 1.0
         self._type = 'lightEntity'
-        # self.scene.add_scene_light(self)
 
     @property
     def color(self) -> np.array:
@@ -45,9 +46,10 @@ class Light(Entity):
                 f'light {self.name}')
             return
         self._color = val
+        self.shader.color = val
 
     @property
-    def intensity(self):
+    def intensity(self) -> float:
         return self._intensity
 
     @intensity.setter

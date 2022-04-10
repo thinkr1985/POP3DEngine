@@ -18,29 +18,27 @@ class Shader:
     def __init__(self, scene, shader_name: str, shader_base_dir: str,
                  color_map_src: str = None, normal_map_src: str = None,
                  apply_default_maps=True, **kwargs):
-        self.name = shader_name
-        self.scene = scene
+        self._name = shader_name
+        self._scene = scene
         self._shader_base_dir = shader_base_dir
-        self.color_map_src = color_map_src
-        self.normal_map_src = normal_map_src
-        self.apply_default_map = apply_default_maps
+        self._color_map_src = color_map_src
+        self._normal_map_src = normal_map_src
+        self._apply_default_map = apply_default_maps
 
-        self.color_texture_map = None
-        self.normal_texture_map = None
-        self._in_use = False
+        self._color_texture_map = None
+        self._normal_texture_map = None
         self._stride = STRIDE
-        self.scene.add_scene_shader(self)
-        self.shader_program = glCreateProgram()
+        self._shader_program = glCreateProgram()
         self._init_shader()
 
     @property
     def shader_attributes(self):
-        '''
+        """
         pointer_offset is nothing but byte offset in the set of vertex data
         for that attribute value.
         example, if "normal" starts at 4th location then byte offset should
         be 3 * 4 = 16
-        '''
+        """
         shader_attribute_dict = {
             'vertexPosition':
                 {'location': 0, 'pointer_offset': 0},
@@ -56,51 +54,53 @@ class Shader:
     def _init_shader(self):
         self._create_texture_maps()
         shaders = self._compile_shader_sources()
-        glLinkProgram(self.shader_program)
+        glLinkProgram(self._shader_program)
 
-        if not glGetProgramiv(self.shader_program, GL_LINK_STATUS):
-            error_ = (glGetProgramInfoLog(self.shader_program))
+        if not glGetProgramiv(self._shader_program, GL_LINK_STATUS):
+            error_ = (glGetProgramInfoLog(self._shader_program))
             raise ShaderProgramLinkError(f'Linking error : {error_}')
 
         for shader in shaders:
-            glDetachShader(self.shader_program, shader)
+            glDetachShader(self._shader_program, shader)
+
+        self._scene.add_scene_shader(self)
 
     def _create_texture_maps(self):
         checker_tex = os.path.join(DEFAULT_TEXTURES, 'checker_board.png')
         normal_map = os.path.join(DEFAULT_TEXTURES, 'checker_board_normal.png')
 
-        if self.apply_default_map:
-            if not self.color_map_src:
+        if self._apply_default_map:
+            if not self._color_map_src:
                 if checker_tex in CACHED_TEXTURE_MAPS:
-                    self.color_texture_map = CACHED_TEXTURE_MAPS.get(
+                    self._color_texture_map = CACHED_TEXTURE_MAPS.get(
                         checker_tex)
                 else:
-                    self.color_texture_map = TextureMap(checker_tex,
-                                                        texture_slot=0)
-                    self.color_texture_map.init_texture()
+                    self._color_texture_map = TextureMap(
+                        checker_tex, texture_slot=0)
+                    self._color_texture_map.init_texture()
                     CACHED_TEXTURE_MAPS.update(
-                        {checker_tex: self.color_texture_map})
+                        {checker_tex: self._color_texture_map})
 
-        if self.apply_default_map:
-            if not self.normal_map_src:
+        if self._apply_default_map:
+            if not self._normal_map_src:
                 if normal_map in CACHED_TEXTURE_MAPS:
-                    self.normal_texture_map = CACHED_TEXTURE_MAPS.get(
+                    self._normal_texture_map = CACHED_TEXTURE_MAPS.get(
                         normal_map)
                 else:
-                    self.normal_texture_map = TextureMap(normal_map,
-                                                         texture_slot=1)
-                    self.normal_texture_map.init_texture()
+                    self._normal_texture_map = TextureMap(
+                        normal_map, texture_slot=1)
+                    self._normal_texture_map.init_texture()
                     CACHED_TEXTURE_MAPS.update(
-                        {normal_map: self.normal_texture_map})
+                        {normal_map: self._normal_texture_map})
 
     def _compile_shader_sources(self) -> list:
-        LOGGER.info(f'Compiling shader {self.name}')
+        LOGGER.info(f'Compiling shader {self._name}')
 
         shader_dir = os.path.join(SHADER_SRC, self._shader_base_dir)
         if not os.path.exists(shader_dir):
             raise ShaderCompilationError(
                 f'Failed to locate shader folder "{shader_dir}" to compile '
-                f'shader "{self.name}"')
+                f'shader "{self._name}"')
 
         found = False
         shaders = list()
@@ -124,7 +124,7 @@ class Shader:
         if not found:
             raise ShaderCompilationError(
                 f'No ".glsl" file found im the shader dir {shader_dir} '
-                f'to compile shader "{self.name}"')
+                f'to compile shader "{self._name}"')
         return shaders
 
     def _compile_shader(self, shader_src_file: str, shader_type: GL_SHADER_TYPE) -> GL_SHADER:
@@ -145,16 +145,28 @@ class Shader:
             raise ShaderCompilationError(
                 f"shader {shader_src_file} compilation error: {error_}"
             )
-        glAttachShader(self.shader_program, shader)
+        glAttachShader(self._shader_program, shader)
         return shader
 
     @property
-    def in_use(self) -> bool:
-        return self._in_use
+    def name(self) -> str:
+        return self._name
 
-    @in_use.setter
-    def in_use(self, val:bool):
-        self._in_use = val
+    @property
+    def shader_program(self) -> int:
+        return self._shader_program
+
+    @property
+    def color_map_src(self) -> str:
+        return self._color_map_src
+
+    @property
+    def normal_map_src(self) -> str:
+        return self._normal_map_src
+
+    @property
+    def apply_default_map(self) -> bool:
+        return self._apply_default_map
 
     @property
     def stride(self) -> int:
@@ -165,11 +177,11 @@ class Shader:
         self._stride = stride_val
 
     def get_all_active_shader_uniforms(self) -> dict:
-        attr_count = glGetProgramiv(self.shader_program, GL_ACTIVE_UNIFORMS)
+        attr_count = glGetProgramiv(self._shader_program, GL_ACTIVE_UNIFORMS)
         active_uniforms = dict()
 
         for attr_index in range(attr_count):
-            attribute = (glGetActiveUniform(self.shader_program, attr_index))
+            attribute = (glGetActiveUniform(self._shader_program, attr_index))
             active_uniforms.update(
                 {
                     attr_index: {
@@ -181,11 +193,11 @@ class Shader:
         return active_uniforms
 
     def get_all_active_shader_attributes(self) -> dict:
-        attr_count = glGetProgramiv(self.shader_program, GL_ACTIVE_ATTRIBUTES)
+        attr_count = glGetProgramiv(self._shader_program, GL_ACTIVE_ATTRIBUTES)
         active_attributes = dict()
 
         for attr_index in range(attr_count):
-            attribute = (glGetActiveAttrib(self.shader_program, attr_index))
+            attribute = (glGetActiveAttrib(self._shader_program, attr_index))
             active_attributes.update(
                 {
                     attr_index: {
@@ -200,7 +212,7 @@ class Shader:
         self.use()
 
         for attribute_name, attrib_data in self.shader_attributes.items():
-            _location = glGetAttribLocation(self.shader_program, attribute_name)
+            _location = glGetAttribLocation(self._shader_program, attribute_name)
             '''
             if glGetAttribLocation returns you -1, don't necessarily mean
             there is problem, glsl removes the attributes if not used in 
@@ -209,13 +221,13 @@ class Shader:
             if _location < 0:
                 LOGGER.warning(
                     f'Attribute "{attribute_name}" skipped to set '
-                    f'on the shader "{self.name}" for entity {entity.name}')
+                    f'on the shader "{self._name}" for entity {entity.name}')
                 continue
             attrib_location = attrib_data.get('location')
-            attrib_pointer_offset = attrib_data.get('pointer_offset')
+            # attrib_pointer_offset = attrib_data.get('pointer_offset')
             LOGGER.info(
                 f'Setting attribute "{attribute_name}" on the '
-                f'shader "{self.name}" for entity {entity.name}')
+                f'shader "{self._name}" for entity {entity.name}')
 
             glBindBuffer(GL_ARRAY_BUFFER, entity.vertex_buffer)
             glEnableVertexAttribArray(attrib_location)
@@ -231,33 +243,28 @@ class Shader:
                          entity.index_buffer)
 
     def use(self):
-        # if self.in_use:
-        #     return
-        if not glGetProgramiv(self.shader_program, GL_LINK_STATUS):
-            glLinkProgram(self.shader_program)
+        if not glGetProgramiv(self._shader_program, GL_LINK_STATUS):
+            glLinkProgram(self._shader_program)
 
-        glUseProgram(self.shader_program)
+        glUseProgram(self._shader_program)
 
-        if self.color_texture_map:
-            self.color_texture_map.use()
-        if self.normal_texture_map:
-            self.normal_texture_map.use()
-
-        self.in_use = True
+        if self._color_texture_map:
+            self._color_texture_map.use()
+        if self._normal_texture_map:
+            self._normal_texture_map.use()
 
     def destroy(self):
-        glDeleteProgram(self.shader_program)
+        glDeleteProgram(self._shader_program)
 
-        if self.color_texture_map:
-            self.color_texture_map.destroy()
-        if self.normal_texture_map:
-            self.normal_texture_map.destroy()
+        if self._color_texture_map:
+            self._color_texture_map.destroy()
+        if self._normal_texture_map:
+            self._normal_texture_map.destroy()
         for attr_name, index in self.shader_attributes.items():
-            pos_attrib_location = glGetAttribLocation(self.shader_program,
+            pos_attrib_location = glGetAttribLocation(self._shader_program,
                                                       attr_name)
             if pos_attrib_location > 0:
                 glDisableVertexAttribArray(pos_attrib_location)
-        self.in_use = False
 
 
 class DefaultShader(Shader):
@@ -296,6 +303,8 @@ class ConstantShader(Shader):
                         )
         if color is None:
             color = [1.0, 1.0, 1.0, 1.0]
+        if len(color) == 3:
+            color.append(1.0)
         self._color = color
         self._set_color(
             self._color[0], self._color[1], self.color[2], self.color[3]
@@ -307,24 +316,22 @@ class ConstantShader(Shader):
 
     @color.setter
     def color(self, color: list):
-        if not len(color) == 4:
+        if len(color) < 3 or len(color) > 4:
             LOGGER.error(
-                f'Failed to set color value "({r},{g},{b},{a})" on shader '
-                f'{self.name}, input color list should have 4 elements'
+                f'Failed to set color value "({color})" on shader '
+                f'{self._name}, input color list should have 4 elements'
                 f' representing r,g,b,a in it.')
             return
-        self._color = color
-        self._set_color(color[0], color[1], color[2], color[3])
+        if len(color) == 3:
+            self._color = [color[0], color[1], color[2], 1.0]
+        else:
+            self._color = color
+        self._set_color(r=self._color[0], g=self._color[1], b=self._color[2],
+                        a=self._color[3])
 
     def _set_color(self, r: float, g: float, b: float, a: float = 1.0):
-        if not r or not b or not g:
-            LOGGER.error(
-                f'Failed to set color value "({r},{g},{b},{a})" on shader '
-                f'{self.name}, input color list should have 3 elements'
-                f' representing r,g,b in it.')
-            return
 
         self.use()
         color_location = glGetUniformLocation(
-            self.shader_program, "constant_color")
+            self._shader_program, "constant_color")
         glUniform4f(color_location, r, g, b, a)

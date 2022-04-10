@@ -3,6 +3,13 @@ from logger import get_logger
 logger = get_logger(__file__)
 
 
+class SceneCreationError(Exception):
+    """Get raised when Scene creation gets failed"""
+    def __init__(self, message=None):
+        super().__init__()
+        logger.error(message)
+
+
 class OpenGLVersionCompatibilityError(Exception):
     """Get raised when OpenGL version is less than 4.0.0"""
     def __init__(self, message=None):
