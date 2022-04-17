@@ -1,5 +1,3 @@
-import numpy as np
-from OpenGL.GL import *
 from renderer import Renderer
 from entity import Entity
 from logger import get_logger
@@ -25,13 +23,13 @@ class Scene:
         self.constant_shader = ConstantShader(scene=self)
         self._renderer = Renderer(self)
         self._active_camera = None
+        self._init_scene()
 
         self.ambient_light = AmbientLight(scene=self,
                                           light_name='default_ambient_light',
                                           color=[0.1, 0.0, 0.5])
         self.add_entity(self.ambient_light, update_uid=False)
         self._grid = Grid(scene=self)
-        self._init_scene()
 
     def __new__(cls, *args, **kwargs):
         scene_name = kwargs.get('scene_name')

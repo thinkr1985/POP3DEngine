@@ -1,7 +1,7 @@
 import numpy as np
 import uuid
 from OpenGL.GL import *
-from pprint import pprint
+
 from logger import get_logger
 from exceptions import EntityCreationError
 import transformation
@@ -17,6 +17,7 @@ class Entity:
         self._name = entity_name
         self._vertex_buffer_list = buffers.get('vertex_buffer')
         self._index_buffer_list = buffers.get('index_buffer')
+        self._visibility = kwargs.get('visibility') or True
 
         self._indices = np.array(self.index_buffer_list, dtype=np.uint32)
         self._vertices = np.array(self.vertex_buffer_list, dtype=np.float32)
@@ -31,7 +32,6 @@ class Entity:
         self._shader = shader or self.scene.default_shader
         self._transformations = transformation.Transformations(
             entity=self, transformations=transformations)
-
         self.triangles_indices = list()
         self.triangles_vertices = list()
 
@@ -103,6 +103,14 @@ class Entity:
         return self._transformations.size
 
     @property
+    def visibility(self) -> (int, bool):
+        return self._visibility
+
+    @visibility.setter
+    def visibility(self, visibility: (int, bool)):
+        self._visibility = visibility
+
+    @property
     def type(self) -> str:
         return self._type
 
@@ -146,11 +154,11 @@ class Entity:
         return self._scene
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def user_attributes(self):
+    def user_attributes(self) -> (None, dict):
         return self._user_attributes
 
     @property
@@ -165,8 +173,48 @@ class Entity:
     def draw_method(self):
         return self._draw_method
 
+    def re_calculate_matrices(self):
+        """This method needs to override in camera entity"""
+        pass
+
+    def setup_mvp_matrix(self):
+        glUniformMatrix4fv(
+            self.shader.active_uniforms['modelMatrix']['location'],
+            1,
+            GL_FALSE,
+            self.transformations.model_matrix
+        )
+
+        glUniformMatrix4fv(
+            self.shader.active_uniforms['viewMatrix']['location'],
+            1,
+            GL_FALSE,
+            self.scene.active_camera.view_matrix
+        )
+
+        glUniformMatrix4fv(
+            self.shader.active_uniforms['projectionMatrix']['location'],
+            1,
+            GL_FALSE,
+            self.scene.active_camera.projection_matrix
+        )
+
+        glUniform3fv(
+            self.shader.active_uniforms['cameraPosition']['location'],
+            1,
+            GL_FALSE,
+            self.scene.active_camera.transformations.position
+        )
+
     def draw(self):
+        if not self._visibility:
+            return
+        if self._type != 'gridEntity' and self._type != 'cameraEntity':
+            self.transformations.rotate.y = self.transformations.rotate.y + 0.5
+
         self.shader.use()
+        self.setup_mvp_matrix()
+
         glBindVertexArray(self.vertex_array_buffer)
         glDrawElements(
             self.draw_method,

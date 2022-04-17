@@ -1,5 +1,5 @@
-import os
 import numpy as np
+import glm
 import imageio
 from OpenGL.GL import *
 from OpenGL.GLUT import *

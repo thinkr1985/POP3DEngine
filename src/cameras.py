@@ -1,7 +1,8 @@
-import pyrr
-import numpy as np
 from OpenGL.GL import *
 from OpenGL.GLUT import *
+import numpy as np
+import pyrr
+import glm
 
 from entity import Entity
 from utilities import utils
@@ -41,23 +42,11 @@ class Camera(Entity):
         self._far_clip = far_clip
         self._near_clip = near_clip
 
-        self.theta = 0
-        self.phi = 0
-        self.update_vectors()
+        self._target_vector = np.array([0, 0, 0], dtype=np.float32)
+        self._global_up_vector = np.array([0, 1, 0], dtype=np.float32)
 
-    def update_vectors(self):
-        self.forwards = np.array(
-            [
-                np.cos(np.deg2rad(self.theta)) * np.cos(np.deg2rad(self.phi)),
-                np.sin(np.deg2rad(self.theta)) * np.cos(np.deg2rad(self.phi)),
-                np.sin(np.deg2rad(self.phi))
-            ],
-            dtype=np.float32
-        )
-
-        globalUp = np.array([0, 1, 0], dtype=np.float32)
-        self.right = np.cross(self.forwards, globalUp)
-        self.up = np.cross(self.right, self.forwards)
+        self._view_matrix = None
+        self._projection_matrix = None
 
     @property
     def focal_length(self) -> float:
@@ -99,12 +88,71 @@ class Camera(Entity):
     def near_clip(self, near_clip: float):
         self._near_clip = float(near_clip)
 
+    @property
+    def global_up_vector(self) -> np.array:
+        return self._global_up_vector
+
+    @property
+    def up_vector(self) -> np.array:
+        return np.cross(self.right_vector, self.direction_vector)
+
+    @property
+    def direction_vector(self) -> np.array:
+        return np.array(
+            [
+                np.cos(np.deg2rad(0)) * np.cos(np.deg2rad(0)),
+                np.sin(np.deg2rad(0)) * np.cos(np.deg2rad(0)),
+                np.sin(np.deg2rad(0))
+            ],
+            dtype=np.float32
+        )
+
+    @property
+    def right_vector(self) -> np.array:
+        return np.cross(self.direction_vector, self._global_up_vector)
+
+    @property
+    def projection_matrix(self) -> pyrr.matrix44:
+        return self._projection_matrix
+
+    @property
+    def view_matrix(self) -> pyrr.matrix44:
+        return self._view_matrix
+
+    def calculate_projection_matrix(self):
+        self._projection_matrix = pyrr.matrix44.create_perspective_projection_matrix(
+            fovy=self._focal_length,
+            aspect=self.aspect_ratio,
+            near=self._near_clip,
+            far=self._far_clip,
+            dtype=np.float32
+        )
+
+    # def calculate_model_matrix(self) -> None:
+    #     """overriding Entity method"""
+    #     pass
+
+    def calculate_view_matrix(self):
+        self._view_matrix = pyrr.matrix44.create_look_at(
+            eye=self.transformations.position,
+            target=self.transformations.position + np.array([0, 0, -1], dtype=np.float32),
+            up=self.up_vector,
+            dtype=np.float32
+        )
+
+    def re_calculate_matrices(self):
+        self.calculate_view_matrix()
+        self.calculate_projection_matrix()
+
     def use(self):
+        self.transformations.rotate.y = self.transformations.rotate.y + 0.1
+        self.re_calculate_matrices()
         """
             pitch: rotation around x axis
             roll:rotation around z axis
             yaw: rotation around y axis
         """
+        '''
         projection_matrix = pyrr.matrix44.create_perspective_projection_matrix(
             fovy=self._focal_length,
             aspect=self.aspect_ratio,
@@ -132,40 +180,14 @@ class Camera(Entity):
                 dtype=np.float32
             )
         )
-
+        '''
         scene_lights = self.scene.get_all_lights()
 
         for shader in self.scene.shaders.values():
             shader.use()
-            atmosphere_color_location = glGetUniformLocation(
-                shader.shader_program,
-                "atmosphereColor")
-            atmosphere_intensity_location = glGetUniformLocation(
-                shader.shader_program,
-                "atmosphereIntensity")
-
-            glUniform3fv(atmosphere_color_location, 1, GL_FALSE,
-                               ATMOSPHERE_DIFFUSE_COLOR)
-
-            glUniform1fv(atmosphere_intensity_location, 1, GL_FALSE,
-                               ATMOSPHERE_DIFFUSE_INTENSITY)
-
-            project_shade_location = glGetUniformLocation(shader.shader_program, "projection")
-            model_shade_location = glGetUniformLocation(shader.shader_program, "model")
-            view_uniform_location = glGetUniformLocation(shader.shader_program, "view")
-            camera_position_uniform = glGetUniformLocation(shader.shader_program, "cameraPosition")
-
-            glUniformMatrix4fv(project_shade_location, 1, GL_FALSE,
-                               projection_matrix)
-
-            glUniformMatrix4fv(model_shade_location, 1, GL_FALSE, model_matrix)
-
-            glUniformMatrix4fv(view_uniform_location, 1, GL_FALSE, view_matrix)
-
-            glUniform3fv(camera_position_uniform, 1, GL_FALSE,
-                               self.transformations.position)
 
             # sending lights information
+            '''
             light_location = {
                 "position": [
                     glGetUniformLocation(shader.shader_program, f"Lights[{i}].position")
@@ -186,18 +208,19 @@ class Camera(Entity):
                              light.transformations.position)
                 glUniform3fv(light_location["color"][i], 1, light.color)
                 glUniform1f(light_location["intensity"][i], light.intensity)
+            '''
 
 
 class PerspectiveCamera(Camera):
     def __init__(self, width: float, height, camera_name: str, scene,
-                 focal_length: float = 35.0, near_clip: float = 0.1,
+                 focal_length: float = 45.0, near_clip: float = 0.1,
                  far_clip: float = 10.0, transformations: list = None,
                  **kwargs):
 
         camera_mesh_data = utils.read_pymesh_file(
             os.path.join(DEFAULT_SHAPES_DIR, 'camera.pymesh'))
 
-        _transformations = transformations or [0, 10, -10, 0, 0, 0, 1, 1, 1]
+        _transformations = transformations or [0, 1, 10, 0, 0, 45, 1, 1, 1]
 
         super().__init__(focal_length=focal_length,
                          width=width,
@@ -205,6 +228,7 @@ class PerspectiveCamera(Camera):
                          far_clip=far_clip,
                          near_clip=near_clip,
                          camera_name=camera_name,
+                         transformations=_transformations,
                          scene=scene,
                          draw_method=GL_LINES,
                          shape_buffers=camera_mesh_data[0]['buffers'],

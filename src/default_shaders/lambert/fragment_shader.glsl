@@ -11,6 +11,7 @@ in vec3 fragmentNormal;
 in vec3 fragmentPosition;
 in vec3 fragAtmosphereColor;
 in float fragAtmosphereIntensity;
+in vec3 newVertexColor;
 
 uniform sampler2D imageTexture;
 uniform PointLight Lights[8];
@@ -28,7 +29,7 @@ void main()
     for (int i = 0; i < 8; i++) {
         temp += calculatePointLight(Lights[i], fragmentPosition, fragmentNormal);
     }
-
+    vec3 new_vertex_color = newVertexColor;
     color = vec4(temp, 1);
 }
 

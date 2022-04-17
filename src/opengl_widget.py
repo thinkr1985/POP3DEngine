@@ -160,19 +160,21 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event.key() == QtCore.Qt.Key.Key_Up or event.key() == QtCore.Qt.Key.Key_W:
+            print('Z +ve', self._scene.active_camera.translate.z)
             self.setCursor(self.zoom_in_cursor)
-            self._scene.render_camera.translate.z = self._scene.render_camera.translate.z + 0.1
+            self._scene.active_camera.translate.z = self._scene.active_camera.translate.z + 0.1
         if event.key() == QtCore.Qt.Key.Key_Down or event.key() == QtCore.Qt.Key.Key_S:
+            print('Z -ve', self._scene.active_camera.translate.z)
             self.setCursor(self.zoom_in_cursor)
-            self._scene.render_camera.translate.z = self._scene.render_camera.translate.z - 0.1
+            self._scene.active_camera.translate.z = self._scene.active_camera.translate.z - 0.1
         if event.key() == QtCore.Qt.Key.Key_Left or event.key() == QtCore.Qt.Key.Key_A:
             self.setCursor(self.move_cursor)
-            self._scene.render_camera.translate.x = self._scene.render_camera.translate.x + 0.1
+            self._scene.active_camera.translate.x = self._scene.active_camera.translate.x + 0.1
         if event.key() == QtCore.Qt.Key.Key_Right or event.key() == QtCore.Qt.Key.Key_D:
             self.setCursor(self.move_cursor)
-            self._scene.render_camera.translate.x = self._scene.render_camera.translate.x - 0.1
+            self._scene.active_camera.translate.x = self._scene.active_camera.translate.x - 0.1
         if event.key() == QtCore.Qt.Key.Key_R:
-            self._scene.render_camera.reset_transformations()
+            self._scene.active_camera.reset_transformations()
         if event.key() == QtCore.Qt.Key.Key_G:
             if not self.grid_on:
                 self.grid_on = True
@@ -193,9 +195,9 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
         self.setCursor(self.zoom_in_cursor)
         if event.angleDelta().y() > 0:
-            self._scene.render_camera.translate.z = self._scene.render_camera.translate.z + 0.5
+            self._scene.active_camera.translate.z = self._scene.active_camera.translate.z + 0.5
         if event.angleDelta().y() < 0:
-            self._scene.render_camera.translate.z = self._scene.render_camera.translate.z - 0.5
+            self._scene.active_camera.translate.z = self._scene.active_camera.translate.z - 0.5
         super(_OpenGLWidget, self).wheelEvent(event)
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
@@ -223,20 +225,20 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         if self.mouse_drag and self.pan_mode:
             self.setCursor(self.move_cursor)
             if event.pos().x() > self.mouse_pos.x():
-                self._scene.render_camera.translate.x = self._scene.render_camera.translate.x + 0.1
+                self._scene.active_camera.translate.x = self._scene.active_camera.translate.x + 0.1
             elif event.pos().x() < self.mouse_pos.x():
-                self._scene.render_camera.translate.x = self._scene.render_camera.translate.x - 0.1
+                self._scene.active_camera.translate.x = self._scene.active_camera.translate.x - 0.1
             if event.pos().y() > self.mouse_pos.y():
-                self._scene.render_camera.translate.y = self._scene.render_camera.translate.y - 0.1
+                self._scene.active_camera.translate.y = self._scene.active_camera.translate.y - 0.1
             elif event.pos().y() < self.mouse_pos.y():
-                self._scene.render_camera.translate.y = self._scene.render_camera.translate.y + 0.1
+                self._scene.active_camera.translate.y = self._scene.active_camera.translate.y + 0.1
 
         if self.mouse_drag and self.zoom_mode:
             self.setCursor(self.zoom_in_cursor)
             if event.pos().x() > self.mouse_pos.x():
-                self._scene.render_camera.translate.z = self._scene.render_camera.translate.z + 0.1
+                self._scene.active_camera.translate.z = self._scene.active_camera.translate.z + 0.1
             elif event.pos().x() < self.mouse_pos.x():
-                self._scene.render_camera.translate.z = self._scene.render_camera.translate.z - 0.1
+                self._scene.active_camera.translate.z = self._scene.active_camera.translate.z - 0.1
             if event.pos().y() > self.mouse_pos.y():
                 pass
             elif event.pos().y() < self.mouse_pos.y():
@@ -245,13 +247,13 @@ class _OpenGLWidget(QtOpenGLWidgets.QOpenGLWidget):
         if self.mouse_drag and self.rotate_mode:
             self.setCursor(self.rotate_cursor)
             if event.pos().x() > self.mouse_pos.x():
-                self._scene.render_camera.rotate.yaw = self._scene.render_camera.rotate.yaw - 1.5
+                self._scene.active_camera.rotate.yaw = self._scene.active_camera.rotate.yaw - 1.5
             elif event.pos().x() < self.mouse_pos.x():
-                self._scene.render_camera.rotate.yaw = self._scene.render_camera.rotate.yaw + 1.5
+                self._scene.active_camera.rotate.yaw = self._scene.active_camera.rotate.yaw + 1.5
             if event.pos().y() > self.mouse_pos.y():
-                self._scene.render_camera.rotate.pitch = self._scene.render_camera.rotate.pitch - 1.5
+                self._scene.active_camera.rotate.pitch = self._scene.active_camera.rotate.pitch - 1.5
             elif event.pos().y() < self.mouse_pos.y():
-                self._scene.render_camera.rotate.pitch = self._scene.render_camera.rotate.pitch + 1.5
+                self._scene.active_camera.rotate.pitch = self._scene.active_camera.rotate.pitch + 1.5
 
         self.mouse_pos = event.pos()
         super(_OpenGLWidget, self).mouseMoveEvent(event)

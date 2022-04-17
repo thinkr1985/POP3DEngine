@@ -29,10 +29,13 @@ class Shader:
         self._normal_texture_map = None
         self._stride = STRIDE
         self._shader_program = glCreateProgram()
+        self._active_uniforms = None
+        self._active_attributes = None
+
         self._init_shader()
 
     @property
-    def shader_attributes(self):
+    def shader_attribute_pointers(self):
         """
         pointer_offset is nothing but byte offset in the set of vertex data
         for that attribute value.
@@ -64,6 +67,17 @@ class Shader:
             glDetachShader(self._shader_program, shader)
 
         self._scene.add_scene_shader(self)
+
+        self._active_uniforms = self.get_all_active_shader_uniforms()
+        self._active_attributes = self.get_all_active_shader_attributes()
+
+    @property
+    def active_uniforms(self) -> dict:
+        return self._active_uniforms
+
+    @property
+    def active_attributes(self) -> dict:
+        return self._active_attributes
 
     def _create_texture_maps(self):
         checker_tex = os.path.join(DEFAULT_TEXTURES, 'checker_board.png')
@@ -184,8 +198,8 @@ class Shader:
             attribute = (glGetActiveUniform(self._shader_program, attr_index))
             active_uniforms.update(
                 {
-                    attr_index: {
-                                    'name': attribute[0].decode('utf-8'),
+                    attribute[0].decode('utf-8'): {
+                                    'location': attr_index,
                                     'size': attribute[1],
                                     'type': attribute[2]
                                 }
@@ -200,8 +214,8 @@ class Shader:
             attribute = (glGetActiveAttrib(self._shader_program, attr_index))
             active_attributes.update(
                 {
-                    attr_index: {
-                                    'name': attribute[0].decode('utf-8'),
+                    attribute[0].decode('utf-8'): {
+                                    'location': attr_index,
                                     'size': attribute[1],
                                     'type': attribute[2]
                                 }
@@ -211,7 +225,7 @@ class Shader:
     def setup_attribute_pointers(self, entity, offset: int):
         self.use()
 
-        for attribute_name, attrib_data in self.shader_attributes.items():
+        for attribute_name, attrib_data in self.shader_attribute_pointers.items():
             _location = glGetAttribLocation(self._shader_program, attribute_name)
             '''
             if glGetAttribLocation returns you -1, don't necessarily mean
@@ -225,9 +239,9 @@ class Shader:
                 continue
             attrib_location = attrib_data.get('location')
             # attrib_pointer_offset = attrib_data.get('pointer_offset')
-            LOGGER.info(
-                f'Setting attribute "{attribute_name}" on the '
-                f'shader "{self._name}" for entity {entity.name}')
+            # LOGGER.info(
+            #     f'Setting attribute "{attribute_name}" on the '
+            #     f'shader "{self._name}" for entity {entity.name}')
 
             glBindBuffer(GL_ARRAY_BUFFER, entity.vertex_buffer)
             glEnableVertexAttribArray(attrib_location)
@@ -260,7 +274,7 @@ class Shader:
             self._color_texture_map.destroy()
         if self._normal_texture_map:
             self._normal_texture_map.destroy()
-        for attr_name, index in self.shader_attributes.items():
+        for attr_name, index in self.shader_attribute_pointers.items():
             pos_attrib_location = glGetAttribLocation(self._shader_program,
                                                       attr_name)
             if pos_attrib_location > 0:

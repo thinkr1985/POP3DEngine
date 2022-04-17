@@ -1,4 +1,4 @@
-import numpy as np
+import glm
 import os
 import psutil
 from OpenGL.GL import *
@@ -29,6 +29,6 @@ PS_PROCESS = psutil.Process(PID)
 
 NUM_LIGHT_LIMITS = 1
 
-ATMOSPHERE_DIFFUSE_COLOR = np.array([0.05, 0, 0.7], dtype=np.float32)
+ATMOSPHERE_DIFFUSE_COLOR = glm.vec3(0.05, 0, 0.7)
 
 ATMOSPHERE_DIFFUSE_INTENSITY = 0.1

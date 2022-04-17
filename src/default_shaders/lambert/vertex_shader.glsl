@@ -11,23 +11,25 @@ out vec2 fragmentTexCoord;
 out vec3 fragmentPosition;
 out vec3 fragAtmosphereColor;
 out float fragAtmosphereIntensity;
+out vec3 newVertexColor;
+out vec3 currentCameraPostion;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-uniform mat4 modelViewProjectMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+
 uniform vec3 atmosphereColor;
 uniform float atmosphereIntensity;
 
 void main()
 {
-    //gl_Position = projection * view * model * vec4(vertexPosition, 1.0);
-    gl_Position = projection * model * vec4(vertexPosition, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(vertexPosition, 1.0);
 
     fragmentTexCoord = vertexUV;
-    fragmentPosition = (model * vec4(vertexPosition, 1.0)).xyz;
-    fragmentNormal = mat3(model) * vertexNormal;
+    fragmentPosition = (modelMatrix * vec4(vertexPosition, 1.0)).xyz;
+    fragmentNormal = mat3(modelMatrix) * vertexNormal;
     fragAtmosphereColor = atmosphereColor;
     fragAtmosphereIntensity = atmosphereIntensity;
+    newVertexColor = vertexColor;
 }
 

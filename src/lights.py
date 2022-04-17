@@ -1,5 +1,5 @@
 import os
-import numpy as np
+import glm
 from OpenGL.GL import *
 
 from logger import get_logger
@@ -34,8 +34,8 @@ class Light(Entity):
         self._type = 'lightEntity'
 
     @property
-    def color(self) -> np.array:
-        return np.array(self._color, dtype=np.float32)
+    def color(self) -> glm.vec3:
+        return glm.vec3(self._color)
 
     @color.setter
     def color(self, val: list):

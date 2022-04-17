@@ -14,6 +14,8 @@ class Transformations:
         self._translation = Translation(self, self._transformations[:3])
         self._rotation = Rotation(self, self._transformations[3:6])
         self._scale = Scale(self, self._transformations[6:])
+
+        self._model_matrix = None
         self._init_transformations()
 
     def __new__(cls, *args, **kwargs):
@@ -45,7 +47,8 @@ class Transformations:
         return f'Transformations({self._entity.name}, {self.transformations})'
 
     def _init_transformations(self):
-        pass
+        self.calculate_model_matrix()
+        # self.entity.re_calculate_matrices()
 
     @property
     def transformations(self) -> list:
@@ -61,10 +64,20 @@ class Transformations:
                                  self.scale[0],
                                  self.scale[1],
                                  self.scale[2]]
+        self.calculate_model_matrix()
+        self.entity.re_calculate_matrices()
+
+    @property
+    def entity(self):
+        return self._entity
 
     @property
     def identity_matrix(self) -> pyrr.matrix44:
         return self._identity_matrix
+
+    @property
+    def model_matrix(self) -> pyrr.matrix44:
+        return self._model_matrix
 
     @property
     def translate(self):
@@ -110,6 +123,36 @@ class Transformations:
         self._translation.translation = [0, 0, 0]
         self._rotation.rotation = [0, 0, 0]
         self._scale.scale = [1, 1, 1]
+
+    @property
+    def translation_matrix(self) -> pyrr.matrix44:
+        return pyrr.matrix44.create_from_translation(
+                vec=self.position,
+                dtype=np.float32)
+
+    @property
+    def rotation_matrix(self) -> pyrr.matrix44:
+        return pyrr.matrix44.multiply(
+            m1=self.identity_matrix,
+            m2=pyrr.matrix44.create_from_eulers(
+                eulers=np.radians(self.rotate.np_array),
+                dtype=np.float32
+            )
+        )
+
+    @property
+    def scale_matrix(self) -> pyrr.matrix44:
+        return pyrr.matrix44.create_from_scale(self.scale)
+
+    def calculate_model_matrix(self):
+        self._model_matrix = pyrr.matrix44.multiply(
+            m1=self.rotation_matrix,
+            m2=self.translation_matrix)
+
+        self._model_matrix = pyrr.matrix44.multiply(
+            m1=self._model_matrix,
+            m2=self.scale_matrix
+        )
 
 
 class TransformBase:
@@ -208,8 +251,8 @@ class Translation(TransformBase):
 class Rotation(TransformBase):
     '''
         pitch: rotation around x axis
-        roll: rotation around y axis
-        yaw: rotation around z axis
+        roll: rotation around z axis
+        yaw: rotation around y axis
     '''
     def __init__(self, transformation: Transformations, base_value: list,
                  type_='Rotation', **kwargs):
@@ -236,19 +279,19 @@ class Rotation(TransformBase):
 
     @property
     def roll(self) -> float:
-        return self.y
+        return self.z
 
     @roll.setter
     def roll(self, value: float):
-        self.y = value
+        self.z = value
 
     @property
     def yaw(self) -> float:
-        return self.z
+        return self.y
 
     @yaw.setter
     def yaw(self, value: float):
-        self.z = value
+        self.y = value
 
 
 class Scale(TransformBase):
